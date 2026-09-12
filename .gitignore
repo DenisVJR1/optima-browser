@@ -1,0 +1,13 @@
+# Залежності та збірка
+**/bin/
+**/obj/
+publish/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# Windows
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,941 @@
+<Window x:Class="OptimaBrowser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:local="clr-namespace:OptimaBrowser"
+        Title="Optima Browser" Height="840" Width="1320" MinHeight="560" MinWidth="980"
+        Icon="Assets/brands/app.ico"
+        WindowStyle="None" ResizeMode="CanResize"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Loaded="OnLoaded" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown"
+        PreviewMouseDown="OnPreviewMouseDown">
+
+    <!-- CaptionHeight=0: перетягування вікна — власний код у TitleBar (кнопки отримують усі кліки) -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="7"
+                            GlassFrameThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <!-- Aurora: повільний дрейф світлових плям — liquid glass фон -->
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+            <BeginStoryboard>
+                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                    <DoubleAnimation Storyboard.TargetName="B1" Storyboard.TargetProperty="Opacity" To="0.95" Duration="0:0:14" />
+                    <DoubleAnimation Storyboard.TargetName="B1" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" To="70" Duration="0:0:14" />
+                    <DoubleAnimation Storyboard.TargetName="B1" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="45" Duration="0:0:14" />
+                    <DoubleAnimation Storyboard.TargetName="B2" Storyboard.TargetProperty="Opacity" To="0.9" Duration="0:0:19" />
+                    <DoubleAnimation Storyboard.TargetName="B2" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" To="-65" Duration="0:0:19" />
+                    <DoubleAnimation Storyboard.TargetName="B2" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-35" Duration="0:0:19" />
+                    <DoubleAnimation Storyboard.TargetName="B3" Storyboard.TargetProperty="Opacity" To="0.8" Duration="0:0:17" />
+                    <DoubleAnimation Storyboard.TargetName="B3" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" To="40" Duration="0:0:17" />
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid x:Name="Root">
+
+        <!-- Liquid backdrop -->
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#121827" Offset="0" />
+                <GradientStop Color="#0A0D16" Offset="0.55" />
+                <GradientStop Color="#070A13" Offset="1" />
+            </LinearGradientBrush>
+        </Grid.Background>
+        <Ellipse x:Name="B1" Width="700" Height="700" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-220,-260,0,0"
+                IsHitTestVisible="False" Opacity="0.6">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#1F35E2D0" Offset="0" />
+                    <GradientStop Color="#0035E2D0" Offset="1" />
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+            <Ellipse.Effect>
+                <BlurEffect Radius="110" />
+            </Ellipse.Effect>
+            <Ellipse.RenderTransform>
+                <TranslateTransform />
+            </Ellipse.RenderTransform>
+        </Ellipse>
+        <Ellipse x:Name="B2" Width="760" Height="760" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-260,-300"
+                IsHitTestVisible="False" Opacity="0.55">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#228B7CFF" Offset="0" />
+                    <GradientStop Color="#008B7CFF" Offset="1" />
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+            <Ellipse.Effect>
+                <BlurEffect Radius="120" />
+            </Ellipse.Effect>
+            <Ellipse.RenderTransform>
+                <TranslateTransform />
+            </Ellipse.RenderTransform>
+        </Ellipse>
+        <Ellipse x:Name="B3" Width="460" Height="460" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,120,0,0"
+                IsHitTestVisible="False" Opacity="0.5">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#0E43E0A0" Offset="0" />
+                    <GradientStop Color="#0043E0A0" Offset="1" />
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+            <Ellipse.Effect>
+                <BlurEffect Radius="100" />
+            </Ellipse.Effect>
+            <Ellipse.RenderTransform>
+                <TranslateTransform />
+            </Ellipse.RenderTransform>
+        </Ellipse>
+
+        <!-- ============ TITLE BAR ============ -->
+        <Grid x:Name="TitleBar" Height="44" VerticalAlignment="Top" Background="Transparent"
+              PreviewMouseLeftButtonDown="TitleBar_PreviewMouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Brand -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="14,0,12,0"
+                        VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonDown="LogoBox_MouseDown"
+                        ToolTip="Optima Browser — подвійний клік крутить лого ✓">
+                <Border x:Name="LogoBox" Width="28" Height="28" CornerRadius="8"
+                        Background="{StaticResource BrushAccentGradient}">
+                    <TextBlock Text="O" FontWeight="Bold" FontSize="15" Foreground="#0A1412"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Optima Browser" FontSize="12.5" FontWeight="SemiBold"
+                           Foreground="{StaticResource BrushTextHi}" Margin="9,0,0,0"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Tabs -->
+            <DockPanel Grid.Column="1" Margin="6,0" LastChildFill="True">
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Width="30" Height="30"
+                        Margin="6,0,4,0" VerticalAlignment="Center" ToolTip="Нова вкладка (Ctrl+T)"
+                        Click="NewTabBtn_Click">
+                    <TextBlock Text="&#xE710;" FontSize="14" />
+                </Button>
+                <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="TabsHost">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="pill" Margin="0,7,6,7" Height="32" Padding="10,0"
+                                    VerticalAlignment="Center" Cursor="Hand"
+                                    Background="{StaticResource BrushGlass}"
+                                    BorderBrush="{StaticResource BrushStroke}"
+                                    BorderThickness="1" CornerRadius="10"
+                                    MouseLeftButtonUp="Tab_Click" MouseDown="Tab_MouseDown">
+                                <Grid Background="Transparent">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="18" Height="18" CornerRadius="5" Margin="0,0,7,0"
+                                            Background="{StaticResource BrushGlassStrong}">
+                                        <Image Width="11" Height="11" Source="{Binding Icon}" Stretch="Uniform" />
+                                    </Border>
+                                    <TextBlock x:Name="ttl" Grid.Column="1" Text="{Binding Title}" FontSize="12"
+                                               Foreground="{StaticResource BrushTextMid}"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="140" />
+                                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="20" Height="20"
+                                            FontSize="9" Margin="6,0,0,0" Tag="{Binding}"
+                                            Click="TabClose_Click" ToolTip="Закрити вкладку (Ctrl+W)">
+                                        <TextBlock Text="&#xE711;" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger SourceName="pill" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="pill" Property="BorderBrush" Value="{StaticResource BrushStrokeStrong}" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                    <Setter TargetName="pill" Property="Background" Value="{StaticResource BrushGlassHover}" />
+                                    <Setter TargetName="pill" Property="BorderBrush" Value="{StaticResource BrushStrokeStrong}" />
+                                    <Setter TargetName="ttl" Property="Foreground" Value="{StaticResource BrushTextHi}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPrivate}" Value="True">
+                                    <Setter TargetName="pill" Property="BorderBrush" Value="#668B7CFF" />
+                                    <Setter TargetName="ttl" Property="Foreground" Value="#B9AFFF" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            </DockPanel>
+
+            <!-- Window controls -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="MinBtn" Style="{StaticResource WinButton}" Click="MinBtn_Click">
+                    <TextBlock Text="&#xE921;" />
+                </Button>
+                <Button x:Name="MaxBtn" Style="{StaticResource WinButton}" Click="MaxBtn_Click">
+                    <TextBlock x:Name="MaxGlyph" Text="&#xE922;" />
+                </Button>
+                <Button x:Name="CloseBtn" Style="{StaticResource CloseButton}" Click="CloseBtn_Click">
+                    <TextBlock Text="&#xE8BB;" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Top highlight line -->
+        <Border x:Name="TopLine" Height="1" VerticalAlignment="Top" Margin="0,44,0,0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00FFFFFF" Offset="0" />
+                    <GradientStop Color="#33FFFFFF" Offset="0.5" />
+                    <GradientStop Color="#00FFFFFF" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- ============ TOOLBAR ============ -->
+        <Grid x:Name="Toolbar" Height="58" VerticalAlignment="Top" Margin="0,45,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" x:Name="BackBtn" Style="{StaticResource IconButton}" Margin="10,0,0,0"
+                    ToolTip="Назад (Alt+←)" Click="BackBtn_Click">
+                <TextBlock Text="&#xE72B;" />
+            </Button>
+            <Button Grid.Column="1" x:Name="FwdBtn" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                    ToolTip="Вперед (Alt+→)" Click="FwdBtn_Click">
+                <TextBlock Text="&#xE72A;" />
+            </Button>
+            <Button Grid.Column="2" x:Name="ReloadBtn" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                    ToolTip="Оновити (Ctrl+R)" Click="ReloadBtn_Click">
+                <TextBlock Text="&#xE72C;" />
+            </Button>
+            <Button Grid.Column="3" x:Name="StopBtn" Style="{StaticResource IconButton}" Margin="2,0,0,0"
+                    Visibility="Collapsed" ToolTip="Зупинити завантаження (Esc)" Click="StopBtn_Click">
+                <TextBlock Text="&#xE71A;" />
+            </Button>
+            <Button Grid.Column="4" x:Name="HomeBtn" Style="{StaticResource IconButton}" Margin="2,0,6,0"
+                    ToolTip="Стартова сторінка" Click="HomeBtn_Click">
+                <TextBlock Text="&#xE80F;" />
+            </Button>
+
+            <!-- Omnibox -->
+            <Border Grid.Column="5" x:Name="Omnibox" Height="38" Margin="0,0,8,0" VerticalAlignment="Center">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource GlassPanel}">
+                        <Style.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter Property="BorderBrush" Value="#6635E2D0" />
+                                <Setter Property="Background" Value="{StaticResource BrushGlassStrong}" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,6,0" VerticalAlignment="Center">
+                        <Image x:Name="EngineMark" Width="15" Height="15" Stretch="Uniform"
+                               Cursor="Hand" ToolTip="Пошуковик — клік щоб змінити"
+                               MouseLeftButtonUp="EngineMark_Click" />
+                        <TextBlock x:Name="SecGlyph" Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                   Foreground="{StaticResource BrushTextLow}" Margin="8,0,4,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBox x:Name="UrlBox" Grid.Column="1" Style="{StaticResource AddressBox}"
+                             VerticalAlignment="Center"
+                             TextChanged="UrlBox_TextChanged"
+                             KeyDown="UrlBox_KeyDown"
+                             LostKeyboardFocus="UrlBox_LostFocus"
+                             PreviewMouseDown="UrlBox_PreviewMouseDown" />
+                    <Button x:Name="StarBtn" Grid.Column="2" Style="{StaticResource IconButton}" Width="30" Height="30"
+                            Margin="4,0,4,0" ToolTip="Закладка (Ctrl+D)" Click="StarBtn_Click">
+                        <TextBlock x:Name="StarGlyph" Text="&#xE734;" FontSize="13"
+                                   Foreground="{StaticResource BrushTextLow}" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Список підказок винесено у корінь Root (SuggPanel) — окремого вікна немає -->
+
+            <!-- Zoom -->
+            <Button Grid.Column="6" Style="{StaticResource IconButton}" Margin="0,0,2,0"
+                    ToolTip="Зменшити (Ctrl+−)" Click="ZoomOut_Click">
+                <TextBlock Text="−" FontFamily="Segoe UI" FontSize="16" FontWeight="Light" />
+            </Button>
+            <Button Grid.Column="7" Style="{StaticResource IconButton}" Margin="0,0,2,0"
+                    ToolTip="Збільшити (Ctrl++)" Click="ZoomIn_Click">
+                <TextBlock Text="+" FontFamily="Segoe UI" FontSize="15" />
+            </Button>
+            <Border Grid.Column="8" Background="{StaticResource BrushGlass}" CornerRadius="8"
+                    BorderBrush="{StaticResource BrushStroke}" BorderThickness="1"
+                    Height="26" VerticalAlignment="Center" Padding="8,0" Margin="0,0,6,0">
+                <TextBlock x:Name="ZoomPill" Text="100%" FontSize="11" Foreground="{StaticResource BrushTextMid}"
+                           VerticalAlignment="Center" />
+            </Border>
+
+            <!-- AdBlock shield -->
+            <Button Grid.Column="9" x:Name="ShieldBtn" Style="{StaticResource IconButton}" Margin="0,0,2,0"
+                    ToolTip="Блокування реклами — увімкнено. Натисни, щоб вимкнути." Click="ShieldBtn_Click">
+                <TextBlock x:Name="ShieldGlyph" Text="🛡" FontSize="14" />
+            </Button>
+
+            <!-- More -->
+            <Button Grid.Column="10" x:Name="MoreBtn" Style="{StaticResource IconButton}" Margin="0,0,10,0"
+                    ToolTip="Більше (пасхалки теж тут)" Click="MoreBtn_Click">
+                <TextBlock Text="&#xE712;" FontSize="16" Foreground="{StaticResource BrushTextHi}" />
+            </Button>
+        </Grid>
+
+        <!-- Toolbar highlight line -->
+        <Border x:Name="BarLine" Height="1" VerticalAlignment="Top" Margin="0,103,0,0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00FFFFFF" Offset="0" />
+                    <GradientStop Color="#1EFFFFFF" Offset="0.5" />
+                    <GradientStop Color="#00FFFFFF" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- ============ CONTENT ============ -->
+        <Grid x:Name="ContentGrid" Margin="0,104,0,26" ClipToBounds="True">
+            <Border x:Name="WebHost" Background="#0A0D16">
+                <wv2:WebView2 x:Name="Core" DefaultBackgroundColor="#FF0A0D16" Visibility="Collapsed"
+                              NavigationStarting="Core_NavigationStarting"
+                              NavigationCompleted="Core_NavigationCompleted"
+                              SourceChanged="Core_SourceChanged" />
+            </Border>
+            <local:StartPage x:Name="Start" Visibility="Visible"
+                             Requested="Start_Requested" />
+        </Grid>
+
+        <!-- ============ ПОШУК ПО СТОРІНЦІ (Ctrl+F) ============ -->
+        <Border x:Name="FindBar" Style="{StaticResource GlassPanel}" Background="#F40B0F18"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,112,8,0"
+                Padding="8,6" Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="🔍" FontSize="12" VerticalAlignment="Center" Margin="2,0,8,0" />
+                <TextBox Grid.Column="1" x:Name="FindBox" Style="{StaticResource AddressBox}" Width="240" Height="28"
+                         FontSize="12.5" VerticalContentAlignment="Center"
+                         TextChanged="FindBox_TextChanged" KeyDown="FindBox_KeyDown" />
+                <TextBlock Grid.Column="2" x:Name="FindCount" Text="" FontSize="11"
+                           Foreground="{StaticResource BrushTextLow}" VerticalAlignment="Center"
+                           Margin="10,0,0,0" MinWidth="36" />
+                <Button Grid.Column="3" Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="11"
+                        Margin="6,0,0,0" ToolTip="Попередній збіг (Shift+Enter)" Click="FindPrev_Click">
+                    <TextBlock Text="▲" FontFamily="Segoe UI" FontSize="10" />
+                </Button>
+                <Button Grid.Column="4" Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="11"
+                        ToolTip="Наступний збіг (Enter)" Click="FindNext_Click">
+                    <TextBlock Text="▼" FontFamily="Segoe UI" FontSize="10" />
+                </Button>
+                <Button Grid.Column="5" Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="10"
+                        ToolTip="Закрити (Esc)" Click="FindClose_Click">
+                    <TextBlock Text="&#xE711;" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ============ SUGGESTIONS (в межах вікна — ніколи не поверх інших програм) ============ -->
+        <Border x:Name="SuggPanel" Style="{StaticResource GlassPanel}" MaxHeight="340"
+                Background="#F20B0F18" Padding="5" Visibility="Collapsed"
+                HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ListBox x:Name="SuggList" Background="Transparent" BorderThickness="0"
+                     FontSize="12.5" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     PreviewMouseLeftButtonDown="SuggList_PreviewMouseDown">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Padding" Value="9,7" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                            CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BrushGlassHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BrushGlassStrong}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                       Foreground="{StaticResource BrushTextLow}"
+                                       Text="{Binding Glyph}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Title}"
+                                       Foreground="{StaticResource BrushTextHi}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Sub}"
+                                       Foreground="{StaticResource BrushTextLow}" FontSize="11"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- ============ DRAWER (bookmarks / history) ============ -->
+        <Border x:Name="Drawer" Width="320" HorizontalAlignment="Right" Visibility="Collapsed"
+                Margin="0,104,0,26"
+                Background="#F40B0F18"
+                BorderBrush="{StaticResource BrushStrokeStrong}" BorderThickness="1,0,0,0">
+            <Border.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScroll}" />
+            </Border.Resources>
+            <Grid Margin="14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="DrawerTitle" Text="Закладки" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushTextHi}" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Style="{StaticResource IconButton}" Width="28" Height="28"
+                            Click="DrawerClose_Click" ToolTip="Закрити (Esc)">
+                        <TextBlock Text="&#xE711;" FontSize="10" />
+                    </Button>
+                </Grid>
+
+                <Border Grid.Row="1" Style="{StaticResource GlassPanel}" Height="32" Margin="0,12,0,10">
+                    <Grid Margin="10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                   Foreground="{StaticResource BrushTextLow}" VerticalAlignment="Center" />
+                        <TextBox x:Name="DrawerSearch" Grid.Column="1" Style="{StaticResource AddressBox}"
+                                 FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"
+                                 TextChanged="DrawerSearch_TextChanged" />
+                    </Grid>
+                </Border>
+
+                <ListBox x:Name="DrawerList" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                         FontSize="12.5" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         MouseDoubleClick="DrawerList_DoubleClick">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="Padding" Value="8,6" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="bd" Property="Background" Value="{StaticResource BrushGlassHover}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           Foreground="{StaticResource BrushTextLow}"
+                                           Text="{Binding Glyph}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Title}"
+                                           Foreground="{StaticResource BrushTextHi}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Sub}"
+                                           Foreground="{StaticResource BrushTextLow}" FontSize="10.5"
+                                           TextTrimming="CharacterEllipsis" />
+                                <Button Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"
+                                        Style="{StaticResource IconButton}" Width="22" Height="22" FontSize="9"
+                                        Tag="{Binding Url}" Click="DrawerItemDelete_Click"
+                                        ToolTip="Видалити">
+                                    <TextBlock Text="&#xE711;" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Button Grid.Row="3" x:Name="DrawerClearBtn" Style="{StaticResource IconButton}"
+                        Height="30" Margin="0,8,0,0" FontFamily="Segoe UI" FontSize="12"
+                        HorizontalContentAlignment="Center" Click="DrawerClear_Click">
+                    Очистити все
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ============ READER MODE ============ -->
+        <Border x:Name="Reader" Margin="0,104,0,26" Visibility="Collapsed"
+                Background="#E60A0D16">
+            <Grid MaxWidth="780" Margin="28,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Name="ReaderTitle" Text="" FontSize="24" FontWeight="SemiBold"
+                           Foreground="{StaticResource BrushTextHi}" TextWrapping="Wrap" />
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,14">
+                    <TextBlock x:Name="ReaderUrl" Text="" FontSize="11"
+                               Foreground="{StaticResource BrushTextLow}" VerticalAlignment="Center" />
+                    <Border Width="1" Height="14" Background="{StaticResource BrushStrokeStrong}" Margin="12,0" />
+                    <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                            ToolTip="Дрібніший шрифт" Click="ReaderSmaller_Click">
+                        <TextBlock Text="A−" FontFamily="Segoe UI" FontSize="11" />
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                            ToolTip="Більший шрифт" Click="ReaderBigger_Click">
+                        <TextBlock Text="A+" FontFamily="Segoe UI" FontSize="13" />
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Width="28" Height="28" Margin="8,0,0,0"
+                            ToolTip="Закрити режим читання (Esc)" Click="ReaderClose_Click">
+                        <TextBlock Text="&#xE711;" FontSize="10" />
+                    </Button>
+                </StackPanel>
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScroll}" />
+                    </ScrollViewer.Resources>
+                    <TextBlock x:Name="ReaderBody" Text="" FontSize="16" LineHeight="1.6"
+                               Foreground="{StaticResource BrushTextHi}" TextWrapping="Wrap" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- ============ SETTINGS ============ -->
+        <Border x:Name="SettingsOverlay" Margin="0,104,0,26" Visibility="Collapsed"
+                Background="#99070A13" MouseLeftButtonDown="SettingsOverlay_MouseDown">
+            <Border Style="{StaticResource GlassPanel}" Width="460" Padding="24"
+                    Background="#F40B0F18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="600">
+                <ScrollViewer.Resources>
+                    <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScroll}" />
+                </ScrollViewer.Resources>
+                <StackPanel>
+                    <TextBlock Text="Налаштування" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushTextHi}" />
+                    <TextBlock Text="Optima Browser" FontSize="11"
+                               Foreground="{StaticResource BrushTextLow}" Margin="0,2,0,18" />
+
+                    <TextBlock Text="Пошуковик" FontSize="12" Foreground="{StaticResource BrushTextMid}" />
+                    <ComboBox x:Name="SearchCmb" Style="{StaticResource GlassCombo}" Margin="0,6,0,16"
+                          SelectionChanged="SearchCmb_Changed">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="{Binding Icon}" Width="20" Height="20" Stretch="Uniform"
+                                           Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Label}" FontSize="13.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Блокування реклами й трекерів" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="перехоплення мережевих запитів на рівні рушія"
+                                       FontSize="11" Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="AdBlockCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="AdBlockCb_Changed" Unchecked="AdBlockCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="🔒 Шифрування трафіку: примусовий HTTPS" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="http:// піднімається до https:// — реальний TLS (увімкнено за замовчуванням)"
+                                       FontSize="11" Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="HttpsCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="HttpsCb_Changed" Unchecked="HttpsCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Примусовий темний режим сторінок" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="застосується до нових вкладок" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="ForceDarkCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="ForceDarkCb_Changed" Unchecked="ForceDarkCb_Changed" />
+                    </Grid>
+
+                    <!-- Тема -->
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Тема оформлення" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="перемикач палітри на льоту" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <ComboBox x:Name="ThemeCmb" Grid.Column="1" Style="{StaticResource GlassCombo}"
+                                  Width="170" SelectionChanged="ThemeCmb_Changed" />
+                    </Grid>
+
+                    <!-- Домашня сторінка -->
+                    <TextBlock Text="Домашня сторінка (порожньо = стартова)" FontSize="12"
+                               Foreground="{StaticResource BrushTextMid}" Margin="0,0,0,6" />
+                    <TextBox x:Name="HomeBox" Style="{StaticResource SettingsBox}" Margin="0,0,0,14"
+                             TextChanged="HomeBox_TextChanged" />
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Зберігати історію" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="вимкни, щоб нічого не записувалось" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="HistCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="HistCb_Changed" Unchecked="HistCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Відновлювати сесію" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="вкладки повертаються після запуску" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="SessCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="SessCb_Changed" Unchecked="SessCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Блок «Нещодавні» на старті" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="останні 6 сайтів на стартовій" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="RecentCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="RecentCb_Changed" Unchecked="RecentCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Ефекти й анімації" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="aurora-фон, дощ частинок — вимкни для економії" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="AnimCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="AnimCb_Changed" Unchecked="AnimCb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Статус-бар" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="RAM, лічильник блоків, підказки" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="StatusCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="StatusCb_Changed" Unchecked="StatusCb_Changed" />
+                    </Grid>
+
+                    <TextBlock Text="🔒 Optima Vault: власне шифрування даних — в меню ⋮ → Захист даних"
+                               FontSize="11" Foreground="{StaticResource BrushTextLow}" Margin="0,4,0,16" />
+
+                    <Grid Margin="0,2,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Масштаб сторінки" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="Ctrl + / Ctrl − / Ctrl 0" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <TextBlock x:Name="SettingsZoomPill" Text="100%" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushAccentCyan}" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="Гарячі клавіші: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · F11 повний екран · Ctrl+Shift+T закрита вкладка"
+                               FontSize="11" Foreground="{StaticResource BrushTextLow}" TextWrapping="Wrap" Margin="0,0,0,14" />
+
+                    <Button Style="{StaticResource IconButton}" Height="34" FontFamily="Segoe UI" FontSize="13"
+                            HorizontalContentAlignment="Center" Click="ClearData_Click" Margin="0,0,0,8"
+                            ToolTip="Очистити куки, кеш, історію, закладки">
+                        Очистити дані браузера
+                    </Button>
+
+                    <Button Style="{StaticResource IconButton}" Height="34" FontFamily="Segoe UI" FontSize="13"
+                            HorizontalContentAlignment="Center" Click="SettingsClose_Click">
+                        Готово
+                    </Button>
+                </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Border>
+
+        <!-- ============ OPTIMA VAULT ============ -->
+        <Border x:Name="VaultOverlay" Margin="0,104,0,26" Visibility="Collapsed"
+                Background="#AA070A13" MouseLeftButtonDown="VaultOverlay_MouseDown">
+            <Border Style="{StaticResource GlassPanel}" Width="400" Padding="24"
+                    Background="#F40B0F18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock x:Name="VaultTitle" Text="Optima Vault" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushTextHi}" />
+                    <TextBlock x:Name="VaultMsg" Text="" FontSize="11.5"
+                               Foreground="{StaticResource BrushTextMid}" Margin="0,4,0,14" TextWrapping="Wrap" />
+
+                    <TextBlock x:Name="VaultCurLabel" Text="Поточний пароль" FontSize="11.5"
+                               Foreground="{StaticResource BrushTextMid}" Margin="0,0,0,4" />
+                    <Border x:Name="VaultCurWrap" Style="{StaticResource GlassPanel}" Height="36" Margin="0,0,0,10">
+                        <PasswordBox x:Name="VaultCur" Style="{StaticResource VaultBox}" VerticalAlignment="Center" Margin="10,0"
+                                     PasswordChanged="VaultBox_PasswordChanged" KeyDown="VaultBox_KeyDown" />
+                    </Border>
+
+                    <TextBlock x:Name="VaultNewLabel" Text="Новий пароль (від 4 символів)" FontSize="11.5"
+                               Foreground="{StaticResource BrushTextMid}" Margin="0,0,0,4" />
+                    <Border x:Name="VaultNewWrap" Style="{StaticResource GlassPanel}" Height="36" Margin="0,0,0,10">
+                        <PasswordBox x:Name="VaultNew" Style="{StaticResource VaultBox}" VerticalAlignment="Center" Margin="10,0"
+                                     PasswordChanged="VaultBox_PasswordChanged" KeyDown="VaultBox_KeyDown" />
+                    </Border>
+
+                    <TextBlock x:Name="VaultNew2Label" Text="Повтори новий пароль" FontSize="11.5"
+                               Foreground="{StaticResource BrushTextMid}" Margin="0,0,0,4" />
+                    <Border x:Name="VaultNew2Wrap" Style="{StaticResource GlassPanel}" Height="36" Margin="0,0,0,12">
+                        <PasswordBox x:Name="VaultNew2" Style="{StaticResource VaultBox}" VerticalAlignment="Center" Margin="10,0"
+                                     PasswordChanged="VaultBox_PasswordChanged" KeyDown="VaultBox_KeyDown" />
+                    </Border>
+
+                    <TextBlock x:Name="VaultError" Text="" FontSize="11.5" Foreground="#FF7A7A"
+                               Margin="0,0,0,8" TextWrapping="Wrap" />
+
+                    <Button x:Name="VaultActionBtn" Style="{StaticResource IconButton}" Height="36"
+                            FontFamily="Segoe UI" FontSize="13.5" HorizontalContentAlignment="Center"
+                            Background="{StaticResource BrushAccentGradient}" Click="VaultAction_Click">
+                        <TextBlock x:Name="VaultActionText" Text="Розблокувати" Foreground="#0A1412" />
+                    </Button>
+                    <Button x:Name="VaultCancelBtn" Style="{StaticResource IconButton}" Height="30"
+                            FontFamily="Segoe UI" FontSize="12.5" HorizontalContentAlignment="Center"
+                            Margin="0,6,0,0" Click="VaultCancel_Click">
+                        <TextBlock x:Name="VaultCancelText" Text="Пропустити" Foreground="{StaticResource BrushTextMid}" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- ============ STATUS BAR ============ -->
+        <Border x:Name="StatusBar" Height="26" VerticalAlignment="Bottom"
+                Background="{StaticResource BrushGlass}">
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#2EFFFFFF" Offset="0" />
+                    <GradientStop Color="#14FFFFFF" Offset="1" />
+                </LinearGradientBrush>
+            </Border.BorderBrush>
+            <Border.BorderThickness>1,1,0,0</Border.BorderThickness>
+            <Grid Margin="12,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Text="Готово"
+                           Foreground="{StaticResource BrushTextLow}" FontSize="11"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="Optima Engine · один рушій"
+                           Foreground="{StaticResource BrushAccentCyan}" FontSize="11" Margin="0,0,14,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" x:Name="BlockedPill" Text="Заблоковано: 0"
+                           Foreground="{StaticResource BrushTextLow}" FontSize="11" Margin="0,0,14,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" x:Name="RamPill" Text="RAM —"
+                           Foreground="{StaticResource BrushTextLow}" FontSize="11" Margin="0,0,14,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" x:Name="TabsPill" Text="Вкладок: 0"
+                           Foreground="{StaticResource BrushTextLow}" FontSize="11"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- ============ ДОСЯГНЕННЯ ============ -->
+        <Border x:Name="AchOverlay" Margin="0,104,0,26" Visibility="Collapsed"
+                Background="#99070A13" MouseLeftButtonDown="AchOverlay_MouseDown">
+            <Border Style="{StaticResource GlassPanel}" Width="600" Padding="22"
+                    Background="#F40B0F18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Досягнення" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock x:Name="AcheCountText" Text="0 / 0 відкрито" FontSize="11.5"
+                                       Foreground="{StaticResource BrushTextLow}" Margin="0,2,0,14" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource IconButton}" Width="30" Height="30"
+                                VerticalAlignment="Top" Click="AchOverlayClose_Click" ToolTip="Закрити (Esc)">
+                            <TextBlock Text="&#xE711;" FontSize="10" />
+                        </Button>
+                    </Grid>
+                    <Border Grid.Row="1" Height="1" Background="{StaticResource BrushStroke}" Margin="0,0,0,14" />
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" MaxHeight="420">
+                        <ScrollViewer.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScroll}" />
+                        </ScrollViewer.Resources>
+                        <WrapPanel x:Name="AchPanel" HorizontalAlignment="Center" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- ============ ТОСТ ДОСЯГНЕННЯ ============ -->
+        <Border x:Name="AchToast" Style="{StaticResource GlassPanel}" HorizontalAlignment="Right"
+                VerticalAlignment="Top" Margin="0,122,20,0" Padding="14,10" Visibility="Collapsed"
+                Background="#F40B0F18" IsHitTestVisible="False">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="AchToastEmojiBox" Width="38" Height="38" CornerRadius="11"
+                        Background="{StaticResource BrushAccentGradient}" VerticalAlignment="Center">
+                    <TextBlock x:Name="AchToastEmoji" Text="★" FontSize="18" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Нове досягнення!" FontSize="10.5"
+                               Foreground="{StaticResource BrushAccentCyan}" />
+                    <TextBlock x:Name="AchToastTitle" Text="" FontSize="13.5" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrushTextHi}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Пасхалки: шар частинок (Konami) -->
+        <Canvas x:Name="FxLayer" IsHitTestVisible="False" />
+
+    </Grid>
+</Window>
