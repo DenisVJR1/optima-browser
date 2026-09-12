@@ -60,6 +60,8 @@ public partial class MainWindow : Window
         new("ocean",  "🌊 Океан — синій",   0x0B1226, 0x04060F, 0x59D5FF, 0x3DD6C4, 0x8E7BFF),
         new("ember",  "🔥 Полум'я — теплий", 0x24110A, 0x0D0605, 0xFF8A4B, 0xFFC24B, 0xFF7B9C),
         new("forest", "🌲 Ліс — зелений",   0x0A1612, 0x040B08, 0x69F0AE, 0x35E2D0, 0x8B7CFF),
+        new("sakura",  "🌸 Сакура — рожева", 0x1D0F16, 0x0B0508, 0xFF7BB3, 0xFF9FCB, 0xB98BFF),
+        new("midnight","🌙 Північ — синя",  0x05070F, 0x02040A, 0x7CA3FF, 0x59D5FF, 0x8B7CFF),
     };
     private bool _acrylic;
 
@@ -119,6 +121,8 @@ public partial class MainWindow : Window
 
     // ---------- нові фішки ----------
     private readonly Stack<string> _closedTabs = new();
+    private readonly HashSet<string> _siteAllow = new(StringComparer.OrdinalIgnoreCase); // per-site: не блокувати
+    private TabVM? _dragTab; private bool _dragArmed, _dragMoved; private double _dragStartX;
     private int _findIdx;
     private bool _fullscreen;
     private static readonly (string P, string Url)[] Quick =
@@ -229,6 +233,8 @@ return JSON.stringify({n:all.length,i:idx2});
         public bool Animations { get; set; } = true;
         public bool ShowStatus { get; set; } = true;
         public string TranslateLang { get; set; } = "uk";
+        public List<string> SiteAllow { get; set; } = new();
+        public bool NightAuto { get; set; } = false;
     }
     private sealed record DrawerItem(string Glyph, string Title, string Sub, string Url);
     private sealed record VaultPayload(List<HistEntry> History, Dictionary<string, string> Bookmarks, string[] SessUrls, bool[] SessPriv);
@@ -246,20 +252,20 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.8 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
+        <div class="s">версія 1.9 · рідке скло · один рушій · Optima Vault · досягнення · 6 тем · примусовий HTTPS</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
-        <li>Блокування реклами й трекерів на рівні рушія</li>
+        <li>Блокування реклами й трекерів на рівні рушія + 🙈 виняток для окремого сайту</li>
         <li>Optima Vault — власне шифрування даних AES-256-GCM</li>
         <li>Примусовий HTTPS: http:// автоматично піднімається до https:// — реальний TLS</li>
+        <li>Вкладки можна **перетягувати** — свій порядок як у великих</li>
+        <li>Імпорт/експорт закладок (HTML) — кнопки у панелі закладок</li>
         <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads, імена без перезапису</li>
         <li>Пошук на сторінці (Ctrl+F), повний екран (F11), мут звуку, калькулятор у адресному рядку</li>
-        <li>Backspace = назад (як Chrome/Edge), Ctrl+Enter = .com домен, Alt+Enter = нова вкладка</li>
-        <li>Ctrl+клік по підказці — відкрити у новій вкладці</li>
-        <li>Переклад сторінок — 12 мов (меню ⋮ → Перекласти сторінку), вибір запам'ятовується</li>
-        <li>Режим читання: лічильник слів і час читання</li>
-        <li>Клік по RAM у статус-барі — звільнити пам'ять (GC)</li>
-        <li>31 досягнення, 4 теми, скріншот, PDF</li>
+        <li>Backspace = назад, Ctrl+Enter = .com, Alt+Enter = нова вкладка, Ctrl+клік по підказці</li>
+        <li>Переклад — 12 мов (⋮ → Перекласти сторінку), обрана запам'ятовується</li>
+        <li>6 тем, авто-нічна тема 21:00–05:59, читач зі словами/часом, GC по RAM-пілу</li>
+        <li>33 досягнення, скріншот, PDF</li>
         </ul>
         <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок. Гарячі: Backspace назад · Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
         </div></body></html>
@@ -294,6 +300,9 @@ return JSON.stringify({n:all.length,i:idx2});
         SizeChanged += (_, _) => RefreshSuggPos();
         SearchCmb.ItemsSource = Engines;
         ThemeCmb.ItemsSource = Themes.Select(t => t.Label).ToList();
+        TabsHost.PreviewMouseLeftButtonDown += TabsHost_PreviewMouseLeftButtonDown;
+        TabsHost.PreviewMouseMove += TabsHost_PreviewMouseMove;
+        TabsHost.PreviewMouseLeftButtonUp += TabsHost_PreviewMouseLeftButtonUp;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -301,7 +310,7 @@ return JSON.stringify({n:all.length,i:idx2});
         TryAcrylic();
         LoadPersist();
         RefreshEngineMark();
-        ApplyTheme(_settings.Theme);
+        ApplyTheme(_settings.NightAuto && IsNightTime() ? "midnight" : _settings.Theme); // авто-нічна тема
         RestoreSession();
         if (_tabs.Count == 0) NewTab();
         ApplyZoom();
@@ -402,6 +411,8 @@ return JSON.stringify({n:all.length,i:idx2});
         ApplyTheme(_settings.Theme);
     }
 
+    private static bool IsNightTime() { var h = DateTime.Now.Hour; return h >= 21 || h < 6; } // 21:00–05:59
+
     // ---------- search engine switch ----------
 
     private void SetEngine(string id)
@@ -459,6 +470,7 @@ return JSON.stringify({n:all.length,i:idx2});
             if (File.Exists(SettingsFile))
                 _settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(SettingsFile)) ?? new Settings();
             _zoomPct = Math.Clamp(_settings.Zoom, 30, 300);
+            _siteAllow.Clear(); foreach (var h in _settings.SiteAllow) _siteAllow.Add(h);
             _vaultActive = File.Exists(VaultFile);
             if (!_vaultActive)
             {
@@ -859,6 +871,7 @@ return JSON.stringify({n:all.length,i:idx2});
         try
         {
             var host = new Uri(e.Request.Uri).Host;
+            if (_siteAllow.Contains(host)) return; // per-site дозвіл: реклама не блокується
             foreach (var b in BlockedHosts)
                 if (host.EndsWith(b, StringComparison.OrdinalIgnoreCase))
                 {
@@ -1081,6 +1094,78 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void ShieldBtn_Click(object sender, RoutedEventArgs e) { _settings.AdBlock = !_settings.AdBlock; SaveSettings(); UpdateShieldUi(); StatusC(_settings.AdBlock ? "Блокування реклами увімкнено" : "Блокування реклами вимкнено"); }
     private void UpdateShieldUi() { ShieldGlyph.Opacity = _settings.AdBlock ? 1.0 : 0.4; ShieldBtn.ToolTip = _settings.AdBlock ? "Блокування реклами — увімкнено." : "Блокування реклами — вимкнено."; }
+    private void ToggleSiteAllow(string host)
+    {
+        if (host.Length == 0) { StatusC("Немає сторінки"); return; }
+        if (!_siteAllow.Remove(host)) _siteAllow.Add(host);
+        _settings.SiteAllow = _siteAllow.ToList(); SaveSettings();
+        StatusC(_siteAllow.Contains(host) ? $"🙈 Реклама не блокується на {host}" : $"🛡 Блокування відновлено на {host}");
+    }
+
+    // ---------- експорт/імпорт закладок (HTML Netscape) ----------
+
+    private void ExportBookmarks()
+    {
+        if (_locked) { StatusC("Vault заблоковано — розблокуй"); return; }
+        var dlg = new SaveFileDialog { Filter = "HTML (*.html)|*.html", FileName = "optima-bookmarks.html" };
+        if (dlg.ShowDialog(this) != true) return;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("<!DOCTYPE NETSCAPE-Bookmark-file-1><META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\"><TITLE>Bookmarks</TITLE><H1>Bookmarks</H1><DL><p>");
+        foreach (var (url, title) in _bookmarks.OrderBy(kv => kv.Value, StringComparer.CurrentCultureIgnoreCase))
+            sb.AppendLine($"<DT><A HREF=\"{Esc(url)}\">{Esc(title.Length == 0 ? TryHost(url) : title)}</A>");
+        sb.AppendLine("</DL><p>");
+        File.WriteAllText(dlg.FileName, sb.ToString(), new System.Text.UTF8Encoding(false));
+        StatusC($"Закладки експортовано: {_bookmarks.Count}"); _ach.Unlock("exp1");
+    }
+
+    private void ImportBookmarks()
+    {
+        if (_locked) { StatusC("Vault заблоковано — розблокуй"); return; }
+        var dlg = new OpenFileDialog { Filter = "HTML (*.html)|*.html" };
+        if (dlg.ShowDialog(this) != true) return;
+        var html = File.ReadAllText(dlg.FileName); int n = 0;
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(html, "<A\\s+HREF=\"([^\"]+)\"[^>]*>([^<]*)</A>", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline))
+        {
+            var u = System.Net.WebUtility.HtmlDecode(m.Groups[1].Value); var t = System.Net.WebUtility.HtmlDecode(m.Groups[2].Value).Trim();
+            if (u.StartsWith("http", StringComparison.OrdinalIgnoreCase) && !_bookmarks.ContainsKey(u)) { _bookmarks[u] = t; n++; }
+        }
+        MarkDirty(); UpdateStar(); FillDrawer(DrawerSearch.Text.Trim());
+        StatusC($"Імпортовано закладок: {n}");
+    }
+
+    // ---------- drag-reorder вкладок ----------
+
+    private void TabsHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject d0 && FindParent<ButtonBase>(d0) != null) return; // кнопки не беруть участь
+        TabVM? t = null;
+        for (var cur = e.OriginalSource as DependencyObject; cur != null; cur = VisualTreeHelper.GetParent(cur))
+            if (cur is FrameworkElement fe && fe.DataContext is TabVM tv) { t = tv; break; }
+        _dragTab = t; _dragArmed = t != null; _dragMoved = false; _dragStartX = e.GetPosition(TabsHost).X;
+    }
+
+    private void TabsHost_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragTab == null || !_dragArmed || e.LeftButton != MouseButtonState.Pressed) return;
+        double x = e.GetPosition(TabsHost).X;
+        if (!_dragMoved && Math.Abs(x - _dragStartX) < 8) return;
+        _dragMoved = true;
+        int old = _tabs.IndexOf(_dragTab); if (old < 0) return;
+        int target = 0;
+        for (int i = 0; i < _tabs.Count; i++)
+        {
+            if (TabsHost.ItemContainerGenerator.ContainerFromItem(_tabs[i]) is FrameworkElement c)
+            { double cx = c.TranslatePoint(new Point(0, 0), TabsHost).X + c.ActualWidth / 2; if (cx < x) target = i + 1; }
+        }
+        target = Math.Clamp(target, 0, _tabs.Count - 1);
+        if (target == old) return;
+        _tabs.RemoveAt(old); _tabs.Insert(target, _dragTab);
+        _activeIdx = Math.Clamp(_tabs.IndexOf(Active ?? _dragTab), 0, _tabs.Count - 1);
+        TabsHost.ItemsSource = null; TabsHost.ItemsSource = _tabs;
+        RefreshChrome(); _ach.Unlock("order1"); _ach.Touch("reorder");
+    }
+
+    private void TabsHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) { _dragTab = null; _dragArmed = false; }
 
     // ---------- more menu ----------
 
@@ -1124,7 +1209,10 @@ return JSON.stringify({n:all.length,i:idx2});
         var set = new MenuItem { Header = "Налаштування", Icon = Png("set") }; set.Click += (_, _) => OpenSettings();
         var achItem = new MenuItem { Header = "Досягнення", Icon = Png("ach") }; achItem.Click += (_, _) => OpenAchievements();
         var wipe = new MenuItem { Header = "Очистити дані браузера", Icon = Png("wipe") }; wipe.Click += (_, _) => _ = ClearDataCore();
-        m.Items.Add(priv); m.Items.Add(set); m.Items.Add(achItem); m.Items.Add(wipe);
+        string hostCur = TryHost(Active?.Url ?? ""); bool hostAllowed = hostCur.Length > 0 && _siteAllow.Contains(hostCur);
+        var allow = new MenuItem { Header = hostAllowed ? "🛡 Блокувати рекламу на цьому сайті" : "🙈 Не блокувати рекламу на цьому сайті", Icon = Png("shield"), IsEnabled = hostCur.Length > 0, ToolTip = hostAllowed ? "Повернути блокування на " + hostCur : "Реклама лишиться на " + hostCur };
+        allow.Click += (_, _) => ToggleSiteAllow(hostCur);
+        m.Items.Add(priv); m.Items.Add(set); m.Items.Add(achItem); m.Items.Add(wipe); m.Items.Add(allow);
         m.Items.Add(new Separator());
         var about = new MenuItem { Header = "Про Optima Browser", Icon = Png("about") }; about.Click += (_, _) => { if (Active != null) OpenAbout(Active); };
         m.Items.Add(about);
@@ -1192,6 +1280,8 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void OpenDrawer(string mode) { if (_locked) { StatusC("Vault заблоковано — розблокуй"); return; } _drawerMode = mode; DrawerTitle.Text = mode == "bookmarks" ? "Закладки" : "Історія"; DrawerSearch.Text = ""; DrawerClearBtn.Content = mode == "bookmarks" ? "Видалити всі закладки" : "Очистити історію"; Drawer.Visibility = Visibility.Visible; FillDrawer(""); }
     private void DrawerClose_Click(object sender, RoutedEventArgs e) { Drawer.Visibility = Visibility.Collapsed; StatusC("Готово"); }
+    private void DrawerExport_Click(object sender, RoutedEventArgs e) => ExportBookmarks();
+    private void DrawerImport_Click(object sender, RoutedEventArgs e) { ImportBookmarks(); FillDrawer(DrawerSearch.Text.Trim()); }
     private void DrawerSearch_TextChanged(object sender, TextChangedEventArgs e) => FillDrawer(DrawerSearch.Text.Trim());
 
     private void FillDrawer(string q)
@@ -1220,6 +1310,7 @@ return JSON.stringify({n:all.length,i:idx2});
         RecentCb.IsChecked = _settings.StartRecent;
         AnimCb.IsChecked = _settings.Animations;
         StatusCb.IsChecked = _settings.ShowStatus;
+        NightCb.IsChecked = _settings.NightAuto;
         if (HomeBox.Text != _settings.Home) HomeBox.Text = _settings.Home;
         int ti = 0; for (int i = 0; i < Themes.Length; i++) if (Themes[i].Id == _settings.Theme) { ti = i; break; }
         ThemeCmb.SelectedIndex = ti;
@@ -1243,6 +1334,7 @@ return JSON.stringify({n:all.length,i:idx2});
     private void RecentCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.StartRecent = RecentCb.IsChecked == true; SaveSettings(); }
     private void AnimCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.Animations = AnimCb.IsChecked == true; SaveSettings(); ApplyUiPrefs(); }
     private void StatusCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ShowStatus = StatusCb.IsChecked == true; SaveSettings(); ApplyUiPrefs(); }
+    private void NightCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.NightAuto = NightCb.IsChecked == true; SaveSettings(); ApplyTheme(_settings.NightAuto && IsNightTime() ? "midnight" : _settings.Theme); StatusC(_settings.NightAuto ? "Авто-нічна тема увімкнена" : "Авто-нічна тема вимкнена"); }
     private void HomeBox_TextChanged(object sender, TextChangedEventArgs e) { if (_uiSyncing) return; _settings.Home = HomeBox.Text.Trim(); SaveSettings(); }
     private void OpenSettings() { SettingsZoomPill.Text = $"{_zoomPct}%"; SettingsOverlay.Visibility = Visibility.Visible; _ach.Unlock("settings1"); }
     private void SettingsOverlay_MouseDown(object sender, MouseButtonEventArgs e) { if (e.OriginalSource == SettingsOverlay) SettingsOverlay.Visibility = Visibility.Collapsed; }

@@ -453,10 +453,20 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="DrawerTitle" Text="Закладки" FontSize="14" FontWeight="SemiBold"
                                Foreground="{StaticResource BrushTextHi}" VerticalAlignment="Center" />
-                    <Button Grid.Column="1" Style="{StaticResource IconButton}" Width="28" Height="28"
+                    <Button Grid.Column="1" Style="{StaticResource IconButton}" Width="26" Height="26"
+                            Click="DrawerExport_Click" ToolTip="Експорт закладок (HTML)">
+                        <TextBlock Text="&#xE898;" FontSize="11" />
+                    </Button>
+                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="26" Height="26"
+                            Click="DrawerImport_Click" ToolTip="Імпорт закладок (HTML)">
+                        <TextBlock Text="&#xE896;" FontSize="11" />
+                    </Button>
+                    <Button Grid.Column="3" Style="{StaticResource IconButton}" Width="28" Height="28"
                             Click="DrawerClose_Click" ToolTip="Закрити (Esc)">
                         <TextBlock Text="&#xE711;" FontSize="10" />
                     </Button>
@@ -670,6 +680,21 @@
                         </StackPanel>
                         <ComboBox x:Name="ThemeCmb" Grid.Column="1" Style="{StaticResource GlassCombo}"
                                   Width="170" SelectionChanged="ThemeCmb_Changed" />
+                    </Grid>
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="🌙 Авто-нічна тема" FontSize="13"
+                                       Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="21:00–05:59 → «Північ»" FontSize="11"
+                                       Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="NightCb" Grid.Column="1" Style="{StaticResource GlassToggle}"
+                                  VerticalAlignment="Center" Checked="NightCb_Changed" Unchecked="NightCb_Changed" />
                     </Grid>
 
                     <!-- Домашня сторінка -->
