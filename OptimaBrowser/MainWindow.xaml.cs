@@ -166,7 +166,7 @@ return JSON.stringify({n:all.length,i:idx2});
     private static readonly Key[] KonamiSeq =
         { Key.Up, Key.Up, Key.Down, Key.Down, Key.Left, Key.Right, Key.Left, Key.Right, Key.B, Key.A };
 
-    private sealed class FX { public Ellipse El = null!; public double Vx, Vy; }
+    private sealed class FX { public FrameworkElement El = null!; public double Vx, Vy; }
 
     private static readonly HashSet<string> BlockedHosts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -236,19 +236,19 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.6 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
+        <div class="s">версія 1.7 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія</li>
         <li>Optima Vault — власне шифрування даних AES-256-GCM</li>
         <li>Примусовий HTTPS: http:// автоматично піднімається до https:// — реальний TLS</li>
-        <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads</li>
+        <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads, імена без перезапису</li>
         <li>Пошук на сторінці (Ctrl+F), повний екран (F11), мут звуку, калькулятор у адресному рядку</li>
         <li>Швидкий пошук префіксами: «g запит», «w запит», «y запит», «gh запит»…</li>
-        <li>Очищення даних браузера, Ctrl+Shift+T — відновити закриту вкладку</li>
-        <li>26 досягнень, 4 теми, режим читання, скріншот, PDF, переклад</li>
+        <li>Очищення даних браузера (Ctrl+Shift+Delete), Ctrl+Shift+T — відновити закриту вкладку</li>
+        <li>29 досягнень, 4 теми, режим читання, скріншот, PDF, переклад</li>
         </ul>
-        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка.</div>
+        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
         </div></body></html>
         """;
 
@@ -732,6 +732,7 @@ return JSON.stringify({n:all.length,i:idx2});
             case "help" or "пасхалки" or "пасхалка" or "easteregg": StatusC("Пасхалки: Konami ↑↑↓↓←→←→BA, відповідь 42, «слава україні», optima:about, 13 вкладок, 100/1000 блоків, подвійний клік по лого, середня кнопка миші на вкладці. Фішки: Ctrl+F пошук, F11 повний екран, «g запит» — Google, «w» — Вікі, «y» — YouTube, «gh» — GitHub, «2+2» — калькулятор."); return;
             case "що": StatusC("Що? Сам задав питання — сам і відповідай."); return;
             case "слава україні" or "glory to ukraine" or "russian warship": TriggerFlagRain(); return;
+            case "котик" or "кіт" or "кот" or "cat": SpawnEmojiRain(new[] { "🐱", "🐈", "🐾", "😻", "🐈⬛" }, 42, "🐱 Мур-мур. Котячий дощ — бо а що ще?"); return;
         }
         if (EvalExpr(t) is double calc) { StatusC($"{t} = {calc:0.########}"); _ach.Unlock("calc1"); return; }
         NavigateTo(Active!, t, addHistory: true);
@@ -871,11 +872,14 @@ return JSON.stringify({n:all.length,i:idx2});
             try { if (Uri.TryCreate(e.DownloadOperation.Uri, UriKind.Absolute, out var du)) name = SafeFileName(Path.GetFileName(du.AbsolutePath)); } catch { }
             if (name.Length == 0) name = "download";
             string full = Path.Combine(dir, name);
+            int k = 1; string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name); // колізія імен: «файл (1).png»
+            while (File.Exists(full)) full = Path.Combine(dir, $"{stem} ({k++}){ext}");
+            name = Path.GetFileName(full);
             e.ResultFilePath = full;
             e.Handled = true;
             _downloads.Insert(0, new DlItem(name, e.DownloadOperation.Uri, full));
             string msg = "Завантаження: " + name;
-            Dispatcher.BeginInvoke(() => StatusC(msg));
+            Dispatcher.BeginInvoke(() => { StatusC(msg); _ach.Unlock("dl1"); });
         }
         catch { }
     }
@@ -898,6 +902,7 @@ return JSON.stringify({n:all.length,i:idx2});
                     StatusC("🔒 Примусовий HTTPS — піднімаю до https://");
                     ShowLoading(false);
                     Dispatcher.BeginInvoke(() => { try { Core.CoreWebView2?.Navigate("https://" + e.Uri.Substring(7)); } catch { } });
+                    _ach.Unlock("https1");
                     return;
                 }
             }
@@ -936,8 +941,9 @@ return JSON.stringify({n:all.length,i:idx2});
         if (Active?.IsPrivate == true || _locked) return;
         if (!_settings.SaveHistory) return;
         if (url.StartsWith("optima:", StringComparison.OrdinalIgnoreCase) || url.StartsWith("about:", StringComparison.OrdinalIgnoreCase)) return;
-        if (_history.Count > 0 && string.Equals(_history[0].Url, url, StringComparison.OrdinalIgnoreCase)) _history[0] = new HistEntry(url, title, DateTime.UtcNow.Ticks);
-        else { _history.Insert(0, new HistEntry(url, title, DateTime.UtcNow.Ticks)); if (_history.Count > 400) _history.RemoveRange(400, _history.Count - 400); }
+        _history.RemoveAll(h => string.Equals(h.Url, url, StringComparison.OrdinalIgnoreCase)); // дедуп як у Chrome: сайт піднімається наверх
+        _history.Insert(0, new HistEntry(url, title, DateTime.UtcNow.Ticks));
+        if (_history.Count > 400) _history.RemoveRange(400, _history.Count - 400);
         MarkDirty();
     }
 
@@ -1034,6 +1040,7 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void ZoomIn_Click(object sender, RoutedEventArgs e) { _zoomPct = Math.Min(_zoomPct + 10, 300); ApplyZoom(); }
     private void ZoomOut_Click(object sender, RoutedEventArgs e) { _zoomPct = Math.Max(_zoomPct - 10, 30); ApplyZoom(); }
+    private void ZoomPill_Click(object sender, MouseButtonEventArgs e) { _zoomPct = 100; ApplyZoom(); StatusC("Масштаб скинуто: 100%"); }
 
     private void ApplyZoom()
     {
@@ -1283,6 +1290,7 @@ return JSON.stringify({n:all.length,i:idx2});
         SettingsOverlay.Visibility = Visibility.Collapsed;
         try { if (_coreReady) await Core.CoreWebView2!.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.AllProfile); } catch { }
         _history.Clear(); _bookmarks.Clear(); _blockedCount = 0; BlockedPill.Text = "Заблоковано: 0"; MarkDirty();
+        _ach.Unlock("wipe1");
         StatusC("Дані очищено: куки, кеш, історія, закладки");
     }
 
@@ -1308,6 +1316,20 @@ return JSON.stringify({n:all.length,i:idx2});
             var el = new Ellipse { Width = _rnd.Next(4, 10), Height = _rnd.Next(4, 10), Fill = new SolidColorBrush(colors[_rnd.Next(colors.Length)]), IsHitTestVisible = false };
             Canvas.SetLeft(el, _rnd.NextDouble() * w); Canvas.SetTop(el, -20 - _rnd.Next(60));
             FxLayer.Children.Add(el); _fx.Add(new FX { El = el, Vx = _rnd.NextDouble() * 2 - 1, Vy = 2.5 + _rnd.NextDouble() * 4 });
+        }
+        _fxTimer.Start();
+    }
+
+    private void SpawnEmojiRain(string[] emojis, int count, string msg)
+    {
+        StatusC(msg);
+        if (!_settings.Animations) return;
+        double w = Root.ActualWidth > 0 ? Root.ActualWidth : 1200;
+        for (int i = 0; i < count; i++)
+        {
+            var tb = new TextBlock { Text = emojis[_rnd.Next(emojis.Length)], FontSize = _rnd.Next(14, 28), IsHitTestVisible = false };
+            Canvas.SetLeft(tb, _rnd.NextDouble() * w); Canvas.SetTop(tb, -20 - _rnd.Next(90));
+            FxLayer.Children.Add(tb); _fx.Add(new FX { El = tb, Vx = _rnd.NextDouble() * 2 - 1, Vy = 2.2 + _rnd.NextDouble() * 3.5 });
         }
         _fxTimer.Start();
     }
@@ -1347,6 +1369,8 @@ return JSON.stringify({n:all.length,i:idx2});
         if (ctrl && shift && e.Key == Key.R) { e.Handled = true; ReaderMode(); }
         else if (ctrl && shift && e.Key == Key.N) { e.Handled = true; NewTab(null, isPrivate: true); }
         else if (ctrl && shift && e.Key == Key.T) { e.Handled = true; ReopenClosedTab(); }
+        else if (ctrl && shift && (e.Key == Key.W || e.Key == Key.Q)) { e.Handled = true; Close(); }
+        else if (ctrl && shift && e.Key == Key.Delete) { e.Handled = true; SettingsOverlay.Visibility = Visibility.Collapsed; _ = ClearDataCore(); }
         else if (ctrl && e.Key == Key.T) { e.Handled = true; NewTab(); }
         else if (ctrl && e.Key == Key.F) { e.Handled = true; OpenFind(); }
         else if (ctrl && e.Key == Key.W) { e.Handled = true; if (Active != null) CloseTab(Active); }
@@ -1361,6 +1385,7 @@ return JSON.stringify({n:all.length,i:idx2});
         else if ((ctrl && e.Key == Key.R) || e.Key == Key.F5) { e.Handled = true; ReloadBtn_Click(this, new RoutedEventArgs()); }
         else if (alt && e.Key == Key.Left) { e.Handled = true; Core.CoreWebView2?.GoBack(); }
         else if (alt && e.Key == Key.Right) { e.Handled = true; Core.CoreWebView2?.GoForward(); }
+        else if (alt && e.Key == Key.Home) { e.Handled = true; HomeBtn_Click(this, new RoutedEventArgs()); }
         else if (ctrl && (e.Key == Key.Add || e.Key == Key.OemPlus)) { e.Handled = true; ZoomIn_Click(this, new RoutedEventArgs()); }
         else if (ctrl && (e.Key == Key.Subtract || e.Key == Key.OemMinus)) { e.Handled = true; ZoomOut_Click(this, new RoutedEventArgs()); }
         else if (ctrl && e.Key == Key.D0) { e.Handled = true; _zoomPct = 100; ApplyZoom(); }
