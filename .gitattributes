@@ -1,0 +1,10 @@
+* text=auto
+
+# PNG/ICO — бінарні, не чіпати
+*.png binary
+*.ico binary
+
+*.xaml text eol=crlf
+*.cs text eol=crlf
+*.csproj text eol=crlf
+*.md text eol=lf
