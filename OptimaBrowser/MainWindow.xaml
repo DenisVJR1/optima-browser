@@ -867,7 +867,8 @@
                            VerticalAlignment="Center" />
                 <TextBlock Grid.Column="3" x:Name="RamPill" Text="RAM —"
                            Foreground="{StaticResource BrushTextLow}" FontSize="11" Margin="0,0,14,0"
-                           VerticalAlignment="Center" />
+                           VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="RamPill_Click"
+                           ToolTip="Клік — звільнити пам'ять (GC)" />
                 <TextBlock Grid.Column="4" x:Name="TabsPill" Text="Вкладок: 0"
                            Foreground="{StaticResource BrushTextLow}" FontSize="11"
                            VerticalAlignment="Center" />

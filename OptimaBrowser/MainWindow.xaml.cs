@@ -246,7 +246,7 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.7.1 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
+        <div class="s">версія 1.8 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія</li>
@@ -254,13 +254,14 @@ return JSON.stringify({n:all.length,i:idx2});
         <li>Примусовий HTTPS: http:// автоматично піднімається до https:// — реальний TLS</li>
         <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads, імена без перезапису</li>
         <li>Пошук на сторінці (Ctrl+F), повний екран (F11), мут звуку, калькулятор у адресному рядку</li>
-        <li>Швидкий пошук префіксами: «g запит», «w запит», «y запит», «gh запит»…</li>
+        <li>Backspace = назад (як Chrome/Edge), Ctrl+Enter = .com домен, Alt+Enter = нова вкладка</li>
+        <li>Ctrl+клік по підказці — відкрити у новій вкладці</li>
         <li>Переклад сторінок — 12 мов (меню ⋮ → Перекласти сторінку), вибір запам'ятовується</li>
-        <li>Очищення даних браузера (Ctrl+Shift+Delete), Ctrl+Shift+T — відновити закриту вкладку</li>
-        <li>30 досягнень, 4 теми, режим читання, скріншот, PDF</li>
+        <li>Режим читання: лічильник слів і час читання</li>
+        <li>Клік по RAM у статус-барі — звільнити пам'ять (GC)</li>
+        <li>31 досягнення, 4 теми, скріншот, PDF</li>
         </ul>
-        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
-        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
+        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок. Гарячі: Backspace назад · Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
         </div></body></html>
         """;
 
@@ -982,7 +983,15 @@ return JSON.stringify({n:all.length,i:idx2});
     {
         switch (e.Key)
         {
-            case Key.Enter: e.Handled = true; SuggPanel.Visibility = Visibility.Collapsed; if (SuggList.SelectedItem is SuggItem sel) NavigateActive(sel.Url); else NavigateActive(UrlBox.Text); break;
+            case Key.Enter:
+                e.Handled = true; SuggPanel.Visibility = Visibility.Collapsed;
+                string q = UrlBox.Text.Trim();
+                SuggItem? chosen = SuggList.SelectedItem as SuggItem;
+                if (chosen != null) q = chosen.Url;
+                else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !q.Contains(' ') && !q.Contains('.')) q = "https://www." + q + ".com"; // Ctrl+Enter — домен .com (як у Chrome)
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) NewTab(q); // Alt+Enter — пошук/адреса у новій вкладці
+                else NavigateActive(q);
+                break;
             case Key.Escape: e.Handled = true; SuggPanel.Visibility = Visibility.Collapsed; break;
             case Key.Down or Key.Up: e.Handled = true; int items = SuggList.Items.Count; if (items == 0) break; ShowSuggestions(); int idx = SuggList.SelectedIndex; idx = e.Key == Key.Down ? Math.Min(idx + 1, items - 1) : Math.Max(idx - 1, 0); SuggList.SelectedIndex = idx; (SuggList.ItemContainerGenerator.ContainerFromIndex(idx) as ListBoxItem)?.BringIntoView(); break;
         }
@@ -995,7 +1004,7 @@ return JSON.stringify({n:all.length,i:idx2});
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (sender is ItemsControl ic && e.OriginalSource is DependencyObject d && ic.ContainerFromElement(d) is ListBoxItem item && item.DataContext is SuggItem s)
-        { e.Handled = true; SuggPanel.Visibility = Visibility.Collapsed; _ach.Unlock("sugg1"); NavigateActive(s.Url); }
+        { e.Handled = true; SuggPanel.Visibility = Visibility.Collapsed; _ach.Unlock("sugg1"); if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) NewTab(s.Url); else NavigateActive(s.Url); } // Ctrl+клік — підказка у новій вкладці
     }
 
     private void BuildSuggestions()
@@ -1047,6 +1056,13 @@ return JSON.stringify({n:all.length,i:idx2});
     // ---------- metrics ----------
 
     private void SampleMetrics() { try { RamPill.Text = $"RAM: {Process.GetCurrentProcess().WorkingSet64 / 1048576} MB"; } catch { } }
+    private void RamPill_Click(object sender, MouseButtonEventArgs e)
+    {
+        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); // жорстка оптимізація: зібрати сміття кліком
+        StatusC("🧲 Пам'ять звільнено (GC)");
+        _ach.Unlock("mem1");
+        SampleMetrics();
+    }
 
     // ---------- zoom ----------
 
@@ -1130,7 +1146,10 @@ return JSON.stringify({n:all.length,i:idx2});
         {
             var json = await Core.CoreWebView2!.ExecuteScriptAsync("(function(){var el=document.querySelector('article,main,[role=\"main\"],.post,.content')||document.body;var txt=(el.innerText||el.textContent||'').replace(/\\n{3,}/g,'\\n\\n').trim().slice(0,120000);return{title:document.title,url:location.href,text:txt};})()");
             var doc = JsonSerializer.Deserialize<JsonElement>(json); var text = doc.GetProperty("text").GetString() ?? "";
-            ReaderTitle.Text = doc.GetProperty("title").GetString() ?? ""; ReaderUrl.Text = doc.GetProperty("url").GetString() ?? "";
+            ReaderTitle.Text = doc.GetProperty("title").GetString() ?? "";
+            int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+            int mins = Math.Max(1, (int)Math.Ceiling(words / 200.0)); // ~200 слів/хв
+            ReaderUrl.Text = $"{doc.GetProperty("url").GetString() ?? ""} · {words:N0} слів · ≈ {mins} хв";
             ReaderBody.Text = text.Length == 0 ? "Тут порожньо." : text; StatusC(text.Length == 0 ? "Режим читання: текст не знайдено" : "Режим читання");
             Reader.Visibility = Visibility.Visible; _ach.Unlock("reader1");
         }
@@ -1217,7 +1236,7 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void SearchCmb_Changed(object sender, SelectionChangedEventArgs e) { if (_uiSyncing || SearchCmb.SelectedIndex < 0) return; SetEngine(Engines[SearchCmb.SelectedIndex].Id); }
     private void AdBlockCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.AdBlock = AdBlockCb.IsChecked == true; SaveSettings(); UpdateShieldUi(); }
-    private void ForceDarkCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ForceDark = ForceDarkCb.IsChecked == true; SaveSettings(); }
+    private void ForceDarkCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ForceDark = ForceDarkCb.IsChecked == true; SaveSettings(); StatusC("Темний режим сторінок — застосується після перезапуску"); }
     private void HttpsCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ForceHttps = HttpsCb.IsChecked == true; SaveSettings(); StatusC(_settings.ForceHttps ? "🔒 Примусовий HTTPS увімкнено" : "Примусовий HTTPS вимкнено"); }
     private void HistCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.SaveHistory = HistCb.IsChecked == true; SaveSettings(); }
     private void SessCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.SaveSession = SessCb.IsChecked == true; SaveSettings(); }
@@ -1392,6 +1411,9 @@ return JSON.stringify({n:all.length,i:idx2});
             if (SuggPanel.Visibility == Visibility.Visible) { SuggPanel.Visibility = Visibility.Collapsed; e.Handled = true; return; }
         }
         if (!ctrl && !alt && !e.IsRepeat) { _konami.Enqueue(e.Key); while (_konami.Count > 10) _konami.Dequeue(); if (_konami.Count == 10 && _konami.SequenceEqual(KonamiSeq)) TriggerKonami(); }
+
+        // Backspace = назад (як у Chrome/Edge) — коли фокус не в текстовому полі і не в рушії
+        if (e.Key == Key.Back && !ctrl && !alt && !UrlBox.IsKeyboardFocusWithin && !FindBox.IsKeyboardFocusWithin && !DrawerSearch.IsKeyboardFocusWithin && !Core.IsKeyboardFocusWithin && _coreReady && Core.Visibility == Visibility.Visible && Core.CoreWebView2?.CanGoBack == true) { e.Handled = true; Core.CoreWebView2.GoBack(); }
 
         if (ctrl && shift && e.Key == Key.R) { e.Handled = true; ReaderMode(); }
         else if (ctrl && shift && e.Key == Key.N) { e.Handled = true; NewTab(null, isPrivate: true); }
