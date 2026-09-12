@@ -38,6 +38,7 @@ public sealed class Achievements
         new("dl1",          "Перший файл",          "Завантажити файл",                                  "📥"),
         new("https1",       "TLS-апгрейд",          "Примусовий HTTPS підняв http:// до https://",      "🔒"),
         new("wipe1",        "Чиста лисина",         "Очистити дані браузера",                            "🧹"),
+        new("trans5",       "Поліглот",             "Перекласти сторінку 5 разів",                      "🗣"),
     };
 
     public event Action<Def>? OnUnlocked;

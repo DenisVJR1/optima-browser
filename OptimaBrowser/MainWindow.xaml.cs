@@ -79,6 +79,15 @@ public partial class MainWindow : Window
         new("ukwiki",    "Вікіпедія (укр)", "https://uk.wikipedia.org/w/index.php?search=", "pack://application:,,,/OptimaBrowser;component/Assets/png/ukwiki.png"),
     };
 
+    // ---------- переклад: 12 мов ----------
+    private static readonly (string Code, string Label)[] TLangs =
+    {
+        ("uk", "Українською 🇺🇦"), ("en", "Англійською 🇬🇧"), ("de", "Німецькою 🇩🇪"),
+        ("fr", "Французькою 🇫🇷"), ("es", "Іспанською 🇪🇸"), ("it", "Італійською 🇮🇹"),
+        ("pl", "Польською 🇵🇱"), ("pt", "Португальською 🇵🇹"), ("nl", "Нідерландською 🇳🇱"),
+        ("cs", "Чеською 🇨🇿"), ("tr", "Турецькою 🇹🇷"), ("zh-CN", "Китайською 🇨🇳"),
+    };
+
     // ---------- state ----------
     private readonly List<TabVM> _tabs = new();
     private int _activeIdx = -1;
@@ -219,6 +228,7 @@ return JSON.stringify({n:all.length,i:idx2});
         public bool StartRecent { get; set; } = true;
         public bool Animations { get; set; } = true;
         public bool ShowStatus { get; set; } = true;
+        public string TranslateLang { get; set; } = "uk";
     }
     private sealed record DrawerItem(string Glyph, string Title, string Sub, string Url);
     private sealed record VaultPayload(List<HistEntry> History, Dictionary<string, string> Bookmarks, string[] SessUrls, bool[] SessPriv);
@@ -236,7 +246,7 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.7 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
+        <div class="s">версія 1.7.1 · рідке скло · один рушій · Optima Vault · досягнення · 4 теми · примусовий HTTPS</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія</li>
@@ -245,9 +255,11 @@ return JSON.stringify({n:all.length,i:idx2});
         <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads, імена без перезапису</li>
         <li>Пошук на сторінці (Ctrl+F), повний екран (F11), мут звуку, калькулятор у адресному рядку</li>
         <li>Швидкий пошук префіксами: «g запит», «w запит», «y запит», «gh запит»…</li>
+        <li>Переклад сторінок — 12 мов (меню ⋮ → Перекласти сторінку), вибір запам'ятовується</li>
         <li>Очищення даних браузера (Ctrl+Shift+Delete), Ctrl+Shift+T — відновити закриту вкладку</li>
-        <li>29 досягнень, 4 теми, режим читання, скріншот, PDF, переклад</li>
+        <li>30 досягнень, 4 теми, режим читання, скріншот, PDF</li>
         </ul>
+        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
         <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок, подвійний клік по логотипу. Гарячі: Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
         </div></body></html>
         """;
@@ -1070,7 +1082,16 @@ return JSON.stringify({n:all.length,i:idx2});
         var reader = new MenuItem { Header = "Режим читання", InputGestureText = "Ctrl+Shift+R", Icon = Png("reader") }; reader.Click += (_, _) => ReaderMode();
         var shot = new MenuItem { Header = "Скріншот сторінки", Icon = Png("shot") }; shot.Click += (_, _) => _ = ScreenshotAsync();
         var pdf = new MenuItem { Header = "Зберегти як PDF", Icon = Png("pdf") }; pdf.Click += (_, _) => _ = SavePdfAsync();
-        var tr = new MenuItem { Header = "Перекласти сторінку", Icon = Png("trans") }; tr.Click += (_, _) => TranslatePage();
+        var accent = (Brush)FindResource("BrushAccentCyan");
+        var tr = new MenuItem { Header = "Перекласти сторінку", Icon = Png("trans"), ToolTip = "12 мов — вибір запам'ятовується" };
+        foreach (var (tcode, tlabel) in TLangs)
+        {
+            bool cur = tcode == _settings.TranslateLang;
+            var li = new MenuItem { Header = tlabel, FontWeight = cur ? FontWeights.SemiBold : FontWeights.Normal, Foreground = cur ? accent : (Brush)FindResource("BrushTextHi") };
+            string c = tcode;
+            li.Click += (_, _) => TranslatePage(c);
+            tr.Items.Add(li);
+        }
         var dl = new MenuItem { Header = "Завантаження", InputGestureText = "Ctrl+J", Icon = Png("dl") }; dl.Click += (_, _) => OpenDownloads();
         m.Items.Add(reader); m.Items.Add(shot); m.Items.Add(pdf); m.Items.Add(tr); m.Items.Add(dl);
         m.Items.Add(new Separator());
@@ -1092,7 +1113,6 @@ return JSON.stringify({n:all.length,i:idx2});
         var about = new MenuItem { Header = "Про Optima Browser", Icon = Png("about") }; about.Click += (_, _) => { if (Active != null) OpenAbout(Active); };
         m.Items.Add(about);
         var vault = new MenuItem { Header = "Захист даних (Optima Vault)", Icon = Png("vault") };
-        var accent = (Brush)FindResource("BrushAccentCyan");
         if (_vaultActive) { if (_vaultPass == null)
         { var u = new MenuItem { Header = "Розблокувати Vault", Icon = Png("unlock"), Foreground = accent, FontWeight = FontWeights.SemiBold }; u.Click += (_, _) => OpenVault(VaultMode.Unlock); vault.Items.Add(u); }
         else { var lk = new MenuItem { Header = "Заблокувати дані", Icon = Png("lock") }; lk.Click += (_, _) => LockVault(); vault.Items.Add(lk); var ch = new MenuItem { Header = "Змінити пароль", Icon = Png("vault") }; ch.Click += (_, _) => OpenVault(VaultMode.Change); vault.Items.Add(ch); var ds = new MenuItem { Header = "Вимкнути шифрування", Icon = Png("vault") }; ds.Click += (_, _) => OpenVault(VaultMode.Disable); vault.Items.Add(ds); } }
@@ -1138,7 +1158,14 @@ return JSON.stringify({n:all.length,i:idx2});
         catch (Exception ex) { StatusC("PDF: " + ex.Message); }
     }
 
-    private void TranslatePage() { var url = Active?.Url; if (string.IsNullOrEmpty(url)) return; _ach.Unlock("translate1"); NavigateActive("https://translate.google.com/translate?sl=auto&tl=uk&u=" + Uri.EscapeDataString(url)); }
+    private void TranslatePage(string lang)
+    {
+        var url = Active?.Url; if (string.IsNullOrEmpty(url)) return;
+        _settings.TranslateLang = lang; SaveSettings(); // запам'ятовуємо вибір мови
+        _ach.Touch("translates"); _ach.TryUnlock("trans5", _ach.Value("translates") >= 5);
+        _ach.Unlock("translate1");
+        NavigateActive("https://translate.google.com/translate?sl=auto&tl=" + lang + "&u=" + Uri.EscapeDataString(url));
+    }
 
     private static string SafeFileName(string s) { foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_'); return s.Length == 0 ? "page" : s; }
 
