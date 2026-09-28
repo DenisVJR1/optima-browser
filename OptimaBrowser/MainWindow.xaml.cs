@@ -135,6 +135,8 @@ public partial class MainWindow : Window
         ("m ",   "https://www.google.com/maps/search/"),
         ("e ",   "https://www.ecosia.org/search?q="),
         ("b ",   "https://www.bing.com/search?q="),
+        ("r ",   "https://www.reddit.com/search/?q="),
+        ("x ",   "https://twitter.com/search?q="),
     };
 
     private const string FindJs = @"(function(q,idx){
@@ -662,11 +664,11 @@ return JSON.stringify({n:all.length,i:idx2});
             var box = new Border { Width = 54, Height = 54, CornerRadius = new CornerRadius(16), HorizontalAlignment = HorizontalAlignment.Center,
                 BorderBrush = got ? (Brush)FindResource("BrushStrokeStrong") : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), BorderThickness = new Thickness(1) };
             box.Background = got ? (Brush)FindResource("BrushAccentGradient") : new SolidColorBrush(Color.FromArgb(30, 255, 255, 255));
-            box.Child = new TextBlock { Text = got ? d.Glyph : "?", FontSize = 21, Foreground = got ? new SolidColorBrush(Color.FromArgb(235, 10, 20, 18)) : low, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            box.Child = new TextBlock { Text = got ? d.Glyph : "🔒", FontSize = 21, Foreground = got ? new SolidColorBrush(Color.FromArgb(235, 10, 20, 18)) : low, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             var cell = new StackPanel { Width = 122, Margin = new Thickness(5, 6, 5, 10) };
             cell.Children.Add(box);
-            cell.Children.Add(new TextBlock { Text = got ? d.Title : "???", FontSize = 11.5, FontWeight = got ? FontWeights.SemiBold : FontWeights.Normal, Foreground = got ? hi : low, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) });
-            cell.Children.Add(new TextBlock { Text = got ? d.Desc : "Тримайся. Поки таємниця.", FontSize = 10, Foreground = low, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0) });
+            cell.Children.Add(new TextBlock { Text = got ? d.Title : "Секретне досягнення", FontSize = 11.5, FontWeight = got ? FontWeights.SemiBold : FontWeights.Normal, Foreground = got ? hi : low, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) });
+            cell.Children.Add(new TextBlock { Text = got ? d.Desc : "Тримайся. Як відкрити — секрет. Спробуй усе.", FontSize = 10, Foreground = low, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0) });
             AchPanel.Children.Add(cell);
         }
     }
@@ -714,6 +716,42 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void Tab_Click(object sender, MouseButtonEventArgs e) { if (sender is FrameworkElement fe && fe.DataContext is TabVM t && !t.IsActive) ActivateTab(t); }
 
+    private void DuplicateTab() { if (Active == null) return; NewTab(Active.Url, Active.IsPrivate); StatusC("Вкладку продубльовано"); }
+
+    private void Tab_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not TabVM t) return;
+        e.Handled = true;
+        var m = new ContextMenu { PlacementTarget = fe };
+        var dup = new MenuItem { Header = "Дублювати вкладку", InputGestureText = "Ctrl+Shift+K", Icon = Png("tab") }; dup.Click += (_, _) => NewTab(t.Url, t.IsPrivate);
+        var nt = new MenuItem { Header = "Нова вкладка", InputGestureText = "Ctrl+T", Icon = Png("home") }; nt.Click += (_, _) => NewTab();
+        m.Items.Add(dup); m.Items.Add(nt); m.Items.Add(new Separator());
+        var others = new MenuItem { Header = "Закрити інші вкладки", Icon = Png("wipe") }; others.Click += (_, _) => { while (_tabs.Count > 1) CloseTab(_tabs[_tabs[0] == t ? 1 : 0]); };
+        var right = new MenuItem { Header = "Закрити праворуч", Icon = Png("wipe") }; right.Click += (_, _) => { while (_tabs.Count > 1 && _tabs[^1] != t) CloseTab(_tabs[^1]); };
+        var left = new MenuItem { Header = "Закрити ліворуч", Icon = Png("wipe") }; left.Click += (_, _) => { while (_tabs.Count > 1 && _tabs[0] != t) CloseTab(_tabs[0]); };
+        m.Items.Add(others); m.Items.Add(right); m.Items.Add(left);
+        m.IsOpen = true;
+    }
+
+    // ---------- пошук по вкладках (Ctrl+Shift+A) ----------
+    private readonly List<TabVM> _tabSearchResult = new();
+    private void OpenTabSearch() { TabSearchBox.Text = ""; FillTabSearch(""); TabSearch.Visibility = Visibility.Visible; TabSearchBox.Focus(); }
+    private void FillTabSearch(string q)
+    {
+        _tabSearchResult.Clear();
+        foreach (var t in _tabs)
+            if (q.Length == 0 || t.Title.Contains(q, StringComparison.OrdinalIgnoreCase) || (t.Url ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)) _tabSearchResult.Add(t);
+        TabSearchList.ItemsSource = _tabSearchResult.Select(t => new DrawerItem("\uE7C3", t.Title.Length == 0 ? "Нова вкладка" : t.Title, t.Url ?? "", ""));
+    }
+    private void TabSearchBox_TextChanged(object sender, TextChangedEventArgs e) => FillTabSearch(TabSearchBox.Text.Trim());
+    private void TabSearchBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; GoTabSearch(); } else if (e.Key == Key.Escape) { e.Handled = true; TabSearch.Visibility = Visibility.Collapsed; } }
+    private void TabSearchList_DoubleClick(object sender, MouseButtonEventArgs e) => GoTabSearch();
+    private void GoTabSearch()
+    {
+        int i = TabSearchList.SelectedIndex;
+        if (i >= 0 && i < _tabSearchResult.Count) { TabSearch.Visibility = Visibility.Collapsed; ActivateTab(_tabSearchResult[i]); }
+    }
+
     private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Middle && sender is FrameworkElement fe && fe.DataContext is TabVM t)
@@ -759,8 +797,32 @@ return JSON.stringify({n:all.length,i:idx2});
             case "слава україні" or "glory to ukraine" or "russian warship": TriggerFlagRain(); return;
             case "котик" or "кіт" or "кот" or "cat": SpawnEmojiRain(new[] { "🐱", "🐈", "🐾", "😻", "🐈⬛" }, 42, "🐱 Мур-мур. Котячий дощ — бо а що ще?"); return;
         }
+        if (TryConvert(t) is string conv) { StatusC(conv); _ach.Unlock("conv1"); return; }
         if (EvalExpr(t) is double calc) { StatusC($"{t} = {calc:0.########}"); _ach.Unlock("calc1"); return; }
         NavigateTo(Active!, t, addHistory: true);
+    }
+
+    // конвертер одиниць у адресному рядку: «100 usd в uah», «25c to f», «10 km mi», «5 kg lb»
+    private static string? TryConvert(string s)
+    {
+        s = s.Trim().ToLowerInvariant().Replace(",", ".").Replace("  ", " ");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(s, "^[0-9. ]+[a-z ]+$") || !s.Any(char.IsLetter)) return null;
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"^(\d+(?:\.\d+)?)\s*([a-z]+)\s+(?:in|to|в|у|до)\s+([a-z]+)$");
+        if (!m.Success) m = System.Text.RegularExpressions.Regex.Match(s, @"^(\d+(?:\.\d+)?)\s*([a-z]+)\s+([a-z]+)$");
+        if (!m.Success || !double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v)) return null;
+        string a = m.Groups[2].Value, b = m.Groups[3].Value;
+        if (a == b) return $"{v:0.##} {a} = {v:0.##} {b} 🙂";
+        var cur = new Dictionary<string, double> { ["usd"] = 41.8, ["eur"] = 45.2, ["gbp"] = 53.1, ["pln"] = 10.4, ["uah"] = 1, ["czk"] = 1.8 };
+        if (cur.TryGetValue(a, out var ra) && cur.TryGetValue(b, out var rb)) return $"{v:0.##} {a} = {v * ra / rb:0.##} {b}";
+        if ((a is "c" or "celsius" && b is "f" or "fahrenheit")) return $"{v:0.##} °C = {v * 9 / 5 + 32:0.##} °F";
+        if ((a is "f" or "fahrenheit" && b is "c" or "celsius")) return $"{v:0.##} °F = {(v - 32) * 5 / 9:0.##} °C";
+        var len = new Dictionary<string, double> { ["km"] = 1000, ["m"] = 1, ["mi"] = 1609.344, ["ft"] = 0.3048, ["in"] = 0.0254, ["cm"] = 0.01, ["mm"] = 0.001 };
+        if (len.TryGetValue(a, out var la) && len.TryGetValue(b, out var lb)) return $"{v:0.##} {a} = {v * la / lb:0.##} {b}";
+        var mass = new Dictionary<string, double> { ["kg"] = 1, ["g"] = 0.001, ["lb"] = 0.453592, ["oz"] = 0.0283495 };
+        if (mass.TryGetValue(a, out var ma) && mass.TryGetValue(b, out var mb)) return $"{v:0.##} {a} = {v * ma / mb:0.##} {b}";
+        var data = new Dictionary<string, double> { ["tb"] = 1048576, ["gb"] = 1024, ["mb"] = 1, ["kb"] = 1.0 / 1024 };
+        if (data.TryGetValue(a, out var da) && data.TryGetValue(b, out var db)) return $"{v:0.##} {a} = {v * da / db:0.##} {b}";
+        return null;
     }
 
     // простий обчислювач у адресному рядку (як у Chrome)
