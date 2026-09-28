@@ -709,6 +709,20 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Автозаповнення паролів" FontSize="13" Foreground="{StaticResource BrushTextHi}" />
+                            <TextBlock Text="використовує захищене сховище Edge" FontSize="11" Foreground="{StaticResource BrushTextLow}" />
+                        </StackPanel>
+                        <CheckBox x:Name="AutofillCb" Grid.Column="1" Style="{StaticResource GlassToggle}" VerticalAlignment="Center" Checked="AutofillCb_Changed" Unchecked="AutofillCb_Changed" />
+                    </Grid>
+
+                    <Button x:Name="DefaultBrowserBtn" Content="Зробити браузером за замовчуванням" Style="{StaticResource OutlineBtn}" Margin="0,4,0,12" Click="DefaultBrowserBtn_Click" />
+
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Зберігати історію" FontSize="13"
                                        Foreground="{StaticResource BrushTextHi}" />
                             <TextBlock Text="вимкни, щоб нічого не записувалось" FontSize="11"

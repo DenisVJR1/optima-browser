@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         new("forest", "🌲 Ліс — зелений",   0x0A1612, 0x040B08, 0x69F0AE, 0x35E2D0, 0x8B7CFF),
         new("sakura",  "🌸 Сакура — рожева", 0x1D0F16, 0x0B0508, 0xFF7BB3, 0xFF9FCB, 0xB98BFF),
         new("midnight","🌙 Північ — синя",  0x05070F, 0x02040A, 0x7CA3FF, 0x59D5FF, 0x8B7CFF),
+        new("cyberpunk","🤖 Cyberpunk — неон",0x121212, 0x050505, 0xFCE205, 0xFF007F, 0x00FFFF),
     };
     private bool _acrylic;
 
@@ -238,6 +239,7 @@ return JSON.stringify({n:all.length,i:idx2});
         public string TranslateLang { get; set; } = "uk";
         public List<string> SiteAllow { get; set; } = new();
         public bool NightAuto { get; set; } = false;
+        public bool Autofill { get; set; } = true;
     }
     private sealed record DrawerItem(string Glyph, string Title, string Sub, string Url);
     private sealed record VaultPayload(List<HistEntry> History, Dictionary<string, string> Bookmarks, string[] SessUrls, bool[] SessPriv);
@@ -930,7 +932,7 @@ return JSON.stringify({n:all.length,i:idx2});
             await Core.EnsureCoreWebView2Async(env);
             var c = Core.CoreWebView2!;
             c.Settings.IsStatusBarEnabled = false; c.Settings.AreDevToolsEnabled = false;
-            c.Settings.IsGeneralAutofillEnabled = false; c.Settings.IsPasswordAutosaveEnabled = false;
+            c.Settings.IsGeneralAutofillEnabled = _settings.Autofill; c.Settings.IsPasswordAutosaveEnabled = _settings.Autofill;
             c.Settings.IsPinchZoomEnabled = true; c.Settings.IsZoomControlEnabled = true;
             c.NewWindowRequested += Core_NewWindowRequested; c.ProcessFailed += Core_ProcessFailed;
             c.DownloadStarting += Core_DownloadStarting;
@@ -1394,6 +1396,7 @@ return JSON.stringify({n:all.length,i:idx2});
         AnimCb.IsChecked = _settings.Animations;
         StatusCb.IsChecked = _settings.ShowStatus;
         NightCb.IsChecked = _settings.NightAuto;
+        AutofillCb.IsChecked = _settings.Autofill;
         if (HomeBox.Text != _settings.Home) HomeBox.Text = _settings.Home;
         int ti = 0; for (int i = 0; i < Themes.Length; i++) if (Themes[i].Id == _settings.Theme) { ti = i; break; }
         ThemeCmb.SelectedIndex = ti;
@@ -1410,6 +1413,26 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void SearchCmb_Changed(object sender, SelectionChangedEventArgs e) { if (_uiSyncing || SearchCmb.SelectedIndex < 0) return; SetEngine(Engines[SearchCmb.SelectedIndex].Id); }
     private void AdBlockCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.AdBlock = AdBlockCb.IsChecked == true; SaveSettings(); UpdateShieldUi(); }
+    
+    private void AutofillCb_Changed(object sender, RoutedEventArgs e) 
+    { 
+        if (_uiSyncing) return; 
+        _settings.Autofill = AutofillCb.IsChecked == true; 
+        SaveSettings(); 
+        if (Core.CoreWebView2 != null)
+        {
+            Core.CoreWebView2.Settings.IsGeneralAutofillEnabled = _settings.Autofill;
+            Core.CoreWebView2.Settings.IsPasswordAutosaveEnabled = _settings.Autofill;
+        }
+        StatusC(_settings.Autofill ? "Автозаповнення паролів увімкнено" : "Автозаповнення вимкнено"); 
+    }
+
+    private void DefaultBrowserBtn_Click(object sender, RoutedEventArgs e)
+    {
+        OptimaBrowser.DefaultBrowser.RegisterAsDefault();
+        StatusC("Реєстрація виконана, відкриваємо налаштування...");
+    }
+
     private void ForceDarkCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ForceDark = ForceDarkCb.IsChecked == true; SaveSettings(); StatusC("Темний режим сторінок — застосується після перезапуску"); }
     private void HttpsCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.ForceHttps = HttpsCb.IsChecked == true; SaveSettings(); StatusC(_settings.ForceHttps ? "🔒 Примусовий HTTPS увімкнено" : "Примусовий HTTPS вимкнено"); }
     private void HistCb_Changed(object sender, RoutedEventArgs e) { if (_uiSyncing) return; _settings.SaveHistory = HistCb.IsChecked == true; SaveSettings(); }
