@@ -1,107 +1,77 @@
 # Optima Browser
 
-> Рідке скло · один EXE · реальне шифрування трафіку
+> Liquid Glass Design · Single Executable · Native Traffic Encryption
 
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4) ![WPF](https://img.shields.io/badge/UI-WPF-4D90FE) ![WebView2](https://img.shields.io/badge/engine-WebView2%20(Edge)-35E2D0) ![License](https://img.shields.io/badge/license-MIT-green)
 
-Справжній Windows-браузер: WPF + WebView2 (рушій Edge), один EXE, liquid glass дизайн — без Electron, без npm, лише .NET.
+A native Windows browser built with WPF and WebView2 (Edge Engine). Delivered as a single executable with a stunning liquid glass design. Completely free of Electron and NPM dependencies - pure .NET performance.
 
-## Запуск
+<p align="center">
+  <img src="logo.svg" alt="Optima Browser Logo" width="200"/>
+</p>
 
-`publish\OptimaBrowser.exe` — портативний. Системний WebView2 Runtime (Edge) має бути встановлений.
+## Getting Started
 
-## Що всередині
+Run `publish\OptimaBrowser.exe` for a fully portable experience. 
+**Prerequisite:** The system WebView2 Runtime (Edge) must be installed (standard on modern Windows systems).
 
-### Ядро й оптимізація
-- **Єдиний рушій на всі вкладки** — WebView2 створюється лише при першій навігації (lazy init), вкладки перемикають один екземпляр.
-- **Suspend рушія** — коли активна стартова сторінка, рушій призупиняється (TrySuspendAsync) і звільняє пам'ять; Resume при навігації.
-- Автовідновлення після збою рушія (ProcessFailed), лічильник RAM.
-- Вимкнені autofill і збереження паролів (менше збору й зайвих даних). Жодного Electron/npm.
+## Features & Architecture
 
-### 🔒 Optima Vault — власне шифрування
-- Історія, закладки й сесія шифруються **AES-256-GCM**, ключ виводиться з майстер-пароля (PBKDF2-SHA256, 100 000 ітерацій), формат `vault.obx`.
-- Увімкнути/змінити/вимкнути, тимчасове блокування даних — меню ⋮ → Захист даних. Забутий пароль = дані недоступні назавжди.
-- **Реальне шифрування трафіку**: TLS 1.3 веде сам рушій Edge; плюс **Примусовий HTTPS** — http:// автоматично піднімається до https:// (крім локальних адрес), тумблер у Налаштуваннях, увімкнено за замовчуванням. Статус-бар показує 🔒 (TLS) або 🌐 на кожній сторінці.
-- Чесно про «ще один шар поверх TLS»: технічно це лише MITM з підміною сертифікатів (ломає безпеку), тому диск шифрує Vault, а трафік — TLS + примусовий HTTPS.
+### Core Optimization
+- **Unified Rendering Engine:** WebView2 is initialized only on the first navigation (lazy init). All tabs intelligently share and switch between a single instance, drastically reducing memory footprint compared to traditional browsers.
+- **Engine Suspend Mode:** When the start page is active, the engine is suspended (`TrySuspendAsync`) to free up system memory, and seamlessly resumes upon navigation.
+- **Stability First:** Features auto-recovery after engine crashes (`ProcessFailed`), built-in RAM counter, and disables unnecessary telemetry, autofill, and password saving for maximum privacy.
 
-### 🔍 Пошук — 10 пошукових систем
-- Bing, Google, DuckDuckGo, Ecosia, Brave Search, Qwant, Startpage, Yahoo, Mojeek і Вікіпедія (укр).
-- **Справжні логотипи рушіїв** (офіційні favicon + резервний Google favicon-сервіс), кожен на білій скляній плитці 64×64 — зашито в EXE, працює офлайн.
-- Перемикання на льоту: Налаштування → Пошуковик, клік по значку в адресному рядку (цикл), або рядок значків прямо на стартовій сторінці.
-- **PNG-іконки всюди**: меню ⋮ — градієнтні PNG-значки для кожного пункту; пошуковики — справжні логотипи; усе зашито в EXE.
+### Optima Vault & Encryption
+- **Local Data Protection:** Browsing history, bookmarks, and session data are encrypted using **AES-256-GCM**.
+- **Master Password:** The encryption key is derived from your master password (using PBKDF2-SHA256 with 100,000 iterations). Stored securely in `vault.obx`.
+- **Data Lock:** You can lock, unlock, or change your password anytime via the Data Protection menu. (Warning: A forgotten password means data is permanently unrecoverable).
+- **Traffic Encryption:** Real TLS 1.3 handled natively by the Edge engine. Additionally, **Forced HTTPS** automatically upgrades HTTP requests to HTTPS (excluding local addresses). The status bar prominently displays the security state (TLS or unencrypted) for every page.
 
-### ⚙️ Налаштування (меню ⋮ → Налаштування)
-- Пошуковик (10), тема (4), блокування реклами, примусовий темний режим, масштаб.
-- **Домашня сторінка** — нова вкладка відкриває твою адресу (порожньо = стартова).
-- Зберігати історію / відновлювати сесію — тумблери.
-- Блок «Нещодавні» на старті — вкл/викл.
-- Ефекти й анімації (aurora, конфеті) — вимкни для економії ресурсів.
-- Статус-бар (RAM, лічильник блоків, підказки) — вкл/викл.
-- **🔒 Примусовий HTTPS** — автоматичне підняття http:// до https:// (реальний TLS), увімкнено за замовчуванням.
-- Налаштування тепер повністю темні: випадаючі списки пошуковика/теми — власний темний шаблон (нуль білого), поля вводу — glass, скролбар — скляний.
+### Integrated Search Systems
+- Access to 10 built-in search engines: Bing, Google, DuckDuckGo, Ecosia, Brave Search, Qwant, Startpage, Yahoo, Mojeek, and Wikipedia (UA).
+- **Embedded Assets:** Genuine high-quality logos for search engines are embedded directly in the executable. They work completely offline and render beautifully on glass-styled tiles.
+- **Prefix Search Support:** Instantly search from the address bar using prefixes: `g query` (Google), `w` (Wikipedia), `y` (YouTube), `gh` (GitHub), `m` (Maps), `ddg` (DuckDuckGo), etc.
 
-### Ексклюзивне
-- **Блокування реклами й трекерів** на рівні рушія (**100+ доменів**), лічильник блоків, тумблер-щит, **🙈 виняток для окремого сайту** (меню ⋮ → «Не блокувати рекламу на цьому сайті»).
-- **Перетягування вкладок** — тягни і відпускай: свій порядок, як у великих браузерах (+ досягнення «Режисер вкладок»).
-- **Імпорт/експорт закладок HTML** — кнопки ⇩/⇧ у панелі закладок (формат Netscape, сумісний з Chrome/Firefox).
-- **Пошук на сторінці** (Ctrl+F / F3) — підсвітка всіх збігів, «n/m», попередній/наступний, Esc — закрити.
-- **Повний екран** (F11 / Esc) — ховає всі панелі, залишається тільки сторінка.
-- **Менеджер завантажень** (Ctrl+J або меню ⋮ → Завантаження): файли тихо падають у папку Downloads (при колізії — «файл (1).png», нічого не перезаписується), список — вбудована сторінка.
-- **Копіювати адресу** (Ctrl+Shift+C), кнопка **+** нової вкладки в таббарі, Ctrl+H — історія. **Alt+Home** — додому, **Ctrl+Shift+W/Q** — закрити вікно.
-- **Ctrl+Shift+T** — відновити закриту вкладку (історія 20 останніх).
-- **Ctrl+Shift+Delete** — очистити дані браузера (куки, кеш, історія, закладки) з будь-якого місця.
-- **Масштаб**: клік по пілу «100%» у тулбарі скидає масштаб (як Ctrl+0).
-- **Звук (mute)** — пункт меню, глушить весь звук рушія.
-- **Калькулятор у адресному рядку** (як у Chrome): введи `2+2` або `(3+5)*7` — відповідь у статус-барі.
-- **Швидкий пошук префіксами**: `g запит` (Google), `w` (Вікіпедія), `y` (YouTube), `gh` (GitHub), `m` (Карти), `ddg` (DuckDuckGo), `e` (Ecosia), `b` (Bing).
-- **Очищення даних браузера** (меню ⋮ або Налаштування): куки, кеш, DOM-сховище, історія, закладки.
-- **Режим читання** (Ctrl+Shift+R) — чистий glass-переглядач статті, A−/A+, **лічильник слів і час читання**.
-- **Скріншот PNG** і **Зберегти як PDF**.
-- **Переклад сторінки — 12 мов** (меню ⋮ → Перекласти сторінку): українська, англійська, німецька, французька, іспанська, італійська, польська, португальська, нідерландська, чеська, турецька, китайська. Обрана мова запам'ятовується (позначена напівжирним у меню).
-- **Навігація як у великих**: **Backspace** — назад (не краде клавішу з полів вводу й сторінок), **Ctrl+Enter** — домен `.com`, **Alt+Enter** — адреса у новій вкладці, **Ctrl+клік по підказці** — підказка у новій вкладці.
-- **🧲 Клік по RAM у статус-барі** — примусовий GC (звільнити пам'ять на вимогу) + досягнення «Збирач сміття».
-- **Приватні вкладки** (Ctrl+Shift+N), **панелі закладок/історії** з пошуком.
-- Примусовий темний режим сторінок (застосовується після перезапуску — про це повідомляє статус-бар), масштаб Ctrl+/−/0, зупинка завантаження Esc.
+### Advanced Settings & Customization
+- Easily toggle search engines, themes, ad-blocking, forced dark mode, and zoom levels.
+- **Custom Home Page:** Configure new tabs to open your preferred address.
+- **Session Management:** Toggles for keeping history, restoring the previous session, and displaying recent sites on the start page.
+- **Performance Adjustments:** Disable visual effects (like aurora and confetti) to save resources on low-end machines.
+- **Deep Dark Mode:** The entire UI, including dropdowns and scrollbars, supports a true dark mode template with zero white flash.
 
-### 🏆 Досягнення
-- **33 значків-досягнень** (меню ⋮ → Досягнення або лічильник 🏆 на старті): перший запуск, 10/25 вкладок, 50/250/1000 блоків, Konami, Слава Україні, закладки, інкогніто, читання, скріншот, PDF, переклад, Vault, 42, налаштування, Про, зум, середня кнопка, підказки, пошук на сторінці, повний екран, калькулятор, **перше завантаження, TLS-апгрейд, очищення даних, 5 перекладів, GC по RAM, перестановка вкладок, експорт закладок**.
-- Тост «Нове досягнення!» при відкритті; прогрес зберігається в `achievements.json`.
+### Exclusive Features
+- **Native Ad & Tracker Blocking:** Engine-level blocking for over 100 known tracker and ad domains. Includes a block counter and per-site exception toggles.
+- **Tab Management:** Drag and drop tabs freely. Use `Ctrl+Shift+T` to restore up to 20 closed tabs.
+- **Bookmark Management:** Full support for importing and exporting HTML bookmarks (Netscape format, compatible with Chrome/Firefox).
+- **In-Page Search:** Fast `Ctrl+F` functionality with match highlighting and navigation.
+- **Built-in Tools:** Integrated download manager (`Ctrl+J`), full screen mode (`F11`), and address bar calculator (e.g., `(3+5)*7`).
+- **Reader Mode:** (`Ctrl+Shift+R`) Strip away clutter and read articles in a clean, glass-style viewer complete with word count and estimated reading time.
+- **Translation:** Translate pages into 12 languages on the fly.
+- **Memory Management:** Click the RAM counter in the status bar to force Garbage Collection and free up memory instantly.
 
-### 🥚 Пасхалки
-- **Konami-код** `↑↑↓↓←→←→BA` — золотий дощ частинок.
-- Секретні команди в адресному рядку: `42`, `44`, `69`, `true`, `false`, `help`, `що`…, **«котик» / «кіт» / «cat» — дощ кошенят 🐱**, і **«слава україні» / «glory to ukraine» / «russian warship»** — синьо-жовтий конфеті-дощ 💙💛.
-- Адресний рядок: `42` — відповідь на головне питання; `optima:about` або меню → «Про» — вбудована сторінка з підказками.
-- Подвійний клік по логотипу — обертання; 13 вкладок — жарт у статус-барі; 100/1000 заблокованих запитів — коментар.
-- Брендові ICO-логотипи 8 сайтів на стартовій сторінці — **вбудовані в EXE** (офлайн-стабільні), фалбек-монограми.
-- Підказки пошуку — панель у межах вікна (не окреме вікно: ніколи не перекриває інші програми).
+### Achievements & Easter Eggs
+- **Gamification:** Unlock 33 unique achievements (e.g., reaching 10/25 tabs, blocking 50/250/1000 trackers, finding easter eggs). Progress is saved locally in `achievements.json`.
+- **Easter Eggs:** Try the Konami code (`Up Up Down Down Left Right Left Right B A`), or type special keywords like `cat`, `42`, or `help` in the address bar.
 
-### 🏠 Стартова сторінка
-- Привітання за часом доби, **порада дня**, «Нещодавні» (останні 6 сайтів з історії, клікабельні), лічильник досягнень 🏆, більші стекляні плитки швидких посилань (56px).
+### User Interface & Design
+- **Liquid Glass Aesthetics:** Utilizes native Acrylic (`DWMWA_SYSTEMBACKDROP_TYPE`) on Windows 11. On Windows 10, it falls back to a custom animated aurora background with translucent panels.
+- **Dynamic Themes:** Choose from 6 stunning themes (Glass, Ocean, Flame, Forest, Sakura, Midnight) that apply instantly without restarting. Includes an Auto-Night mode based on your local time.
+- **Custom Window Controls:** Clean, borderless WindowChrome implementation with custom dragging logic and hover highlights.
+- **Attention to Detail:** Gradient icons, glowing focus states, thin glass scrollbars, and smooth animations create a premium feel.
 
-### 🎨 Теми оформлення
-- **6 тем** (Налаштування → Тема): Glass — темний, 🌊 Океан, 🔥 Полум'я, 🌲 Ліс, 🌸 Сакура, 🌙 Північ — перемикають фон і всі акценти на льоту, зберігаються.
-- **🌙 Авто-нічна тема** (Налаштування): 21:00–05:59 автоматично вмикає «Північ».
-- Стартова сторінка прозора: aurora/акрил видно крізь неї.
+## Build Instructions
 
-### Дизайн
-- **Реальний liquid glass**: на Windows 11 — нативний акрил через `DWMWA_SYSTEMBACKDROP_TYPE` (DWM); на Windows 10 — власний анімований аурора-фон + напівпрозорі панелі (фолбек).
-- **Виправлені кнопки вікна**: згорнути/розгорнути/закрити нічим не перехоплюються (WindowChrome без caption-зони, перетягування — власний код), прямокутні зони 46×44, hover-підсвітка, закрити — червоне, подвійний клік по вільному місцю тайтлбару — розгорнути.
-- **Меню ⋮ з кольоровими значками**: кожен пункт — градієнтний бейдж (своя пара кольорів на групу дій).
-- Анімована aurora (світлові плями плавно дрейфують), скляні панелі з кантом і відблиском, glow omnibox при фокусі, тонкі glass-скролбари, акцент cyan→emerald→violet.
-- Власна іконка програми: **скляна сфера-орбіта** — майстер 512px, темна плитка з верхнім підсвітленням і діагональним блиском, глянцева куля (cyan→emerald→фіолет), подвійне кільце-орбіта з розривом, 3 іскри з білим ядром, відблиски (7 розмірів 16–256, зашита в EXE). Та сама іконка — на стартовій сторінці (обертається при кліку).
-- Контрастне темне меню ⋮: **нуль білого** (власний шаблон ContextMenu + MenuItem з тінями), PNG-іконки у кожному пункті, клацабельна на весь рядок, hover-підсвітка акцентом, темні сепаратори.
-- Підменю Vault відкривається **ліворуч** (меню біля правого краю — праворуч воно злітало за екран) і лишається відкритим (StaysOpen); «Розблокувати Vault» / «Увімкнути шифрування» — акцентна кнопка з золотим значком 🔓.
-
-Дані — `%LOCALAPPDATA%\OptimaBrowser` (JSON, `achievements.json` або зашифрований `vault.obx`; crash-лог — `crash.log`).
-
-## Збірка
+To build the project yourself, ensure you have the .NET 8 SDK installed, then run:
 
 ```powershell
 dotnet publish OptimaBrowser -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
 ```
 
-## Ліцензія
+## Data Storage Location
 
-MIT — дивись [LICENSE](LICENSE).
+All local data is stored at `%LOCALAPPDATA%\OptimaBrowser`. This includes `achievements.json`, `crash.log`, and the encrypted `vault.obx`.
 
-ponytail: позиція скролу вкладки не зберігається. DoH-налаштування DNS, split-view і профілі (як у Chrome) — кандидати наступного кроку.
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
