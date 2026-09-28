@@ -43,6 +43,7 @@ public sealed class TabVM : System.ComponentModel.INotifyPropertyChanged
 
     public string? Url { get; set; }
     public bool IsPrivate { get; set; }
+    public double ScrollY { get; set; } = 0;
 
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     private void Changed(string n) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(n));
@@ -691,8 +692,19 @@ return JSON.stringify({n:all.length,i:idx2});
         if (_tabs.Count == 13 && !isPrivate) StatusC("13 вкладок. Щасливе число. Продовжуй.");
     }
 
-    private void ActivateTab(TabVM tab)
+    private async void ActivateTab(TabVM tab)
     {
+        if (Active != null && _coreReady && Core.Visibility == Visibility.Visible)
+        {
+            try
+            {
+                var scrollRes = await Core.ExecuteScriptAsync("window.scrollY;");
+                if (double.TryParse(scrollRes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double y))
+                    Active.ScrollY = y;
+            }
+            catch { }
+        }
+
         _activeIdx = _tabs.IndexOf(tab); foreach (var t in _tabs) t.IsActive = t == tab; RefreshChrome();
         if (string.IsNullOrEmpty(tab.Url)) { ShowStart(); StatusC(tab.IsPrivate ? "Приватна вкладка" : "Готово"); }
         else { ShowWeb(); NavigateTo(tab, tab.Url!, addHistory: false); }
@@ -735,6 +747,7 @@ return JSON.stringify({n:all.length,i:idx2});
 
     // ---------- пошук по вкладках (Ctrl+Shift+A) ----------
     private readonly List<TabVM> _tabSearchResult = new();
+    /*
     private void OpenTabSearch() { TabSearchBox.Text = ""; FillTabSearch(""); TabSearch.Visibility = Visibility.Visible; TabSearchBox.Focus(); }
     private void FillTabSearch(string q)
     {
@@ -751,6 +764,7 @@ return JSON.stringify({n:all.length,i:idx2});
         int i = TabSearchList.SelectedIndex;
         if (i >= 0 && i < _tabSearchResult.Count) { TabSearch.Visibility = Visibility.Collapsed; ActivateTab(_tabSearchResult[i]); }
     }
+    */
 
     private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -908,8 +922,10 @@ return JSON.stringify({n:all.length,i:idx2});
     {
         try
         {
-            CoreWebView2EnvironmentOptions? opts = null;
-            if (_settings.ForceDark) opts = new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = "--enable-features=WebContentsForceDark" };
+            CoreWebView2EnvironmentOptions? opts = new CoreWebView2EnvironmentOptions();
+            var args = new List<string> { "--enable-features=AsyncDns,dns-over-https", "--force-doh-server=https://cloudflare-dns.com/dns-query" };
+            if (_settings.ForceDark) args.Add("--enable-features=WebContentsForceDark");
+            opts.AdditionalBrowserArguments = string.Join(" ", args);
             var env = await CoreWebView2Environment.CreateAsync(null, CoreDataDir, opts);
             await Core.EnsureCoreWebView2Async(env);
             var c = Core.CoreWebView2!;
@@ -998,7 +1014,7 @@ return JSON.stringify({n:all.length,i:idx2});
         if (Active != null && !string.IsNullOrEmpty(e.Uri)) { Active.Url = e.Uri; SyncUrlBox(e.Uri, force: true); UpdateSecurityGlyph(e.Uri); UpdateStar(); }
     }
 
-    private void Core_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    private async void Core_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         ShowLoading(false); if (IsOptimaTab) return;
         var tab = Active; var src = Core.CoreWebView2?.Source?.ToString() ?? tab?.Url ?? "";
@@ -1011,6 +1027,11 @@ return JSON.stringify({n:all.length,i:idx2});
             PushHistory(src, tab.Title); SyncUrlBox(src, force: true);
             StatusC((src.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? "🔒 " : "🌐 ") + host);
             if (!tab.IsPrivate) _ach.Unlock("first_page");
+
+            if (tab.ScrollY > 0)
+            {
+                try { await Core.ExecuteScriptAsync($"window.scrollTo(0, {tab.ScrollY.ToString(System.Globalization.CultureInfo.InvariantCulture)});"); } catch { }
+            }
         }
         else if (!e.IsSuccess) StatusC("Помилка: " + e.WebErrorStatus);
     }
