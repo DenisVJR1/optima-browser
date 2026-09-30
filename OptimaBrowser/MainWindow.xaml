@@ -140,7 +140,8 @@
                                     Background="{StaticResource BrushGlass}"
                                     BorderBrush="{StaticResource BrushStroke}"
                                     BorderThickness="1" CornerRadius="10"
-                                    MouseLeftButtonUp="Tab_Click" MouseDown="Tab_MouseDown">
+                                    MouseLeftButtonUp="Tab_Click" MouseDown="Tab_MouseDown"
+                                    MouseRightButtonUp="Tab_RightClick">
                                 <Grid Background="Transparent">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -337,6 +338,42 @@
             <local:StartPage x:Name="Start" Visibility="Visible"
                              Requested="Start_Requested" />
         </Grid>
+
+        <!-- ============ ПОШУК ПО ВКЛАДКАХ (Ctrl+Shift+A) ============ -->
+        <Border x:Name="TabSearch" Style="{StaticResource GlassPanel}" Background="#F40B0F18"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,112,8,0"
+                Padding="8" Width="320" MaxHeight="280" Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBox x:Name="TabSearchBox" Style="{StaticResource AddressBox}" Height="28" FontSize="12"
+                         TextChanged="TabSearchBox_TextChanged" KeyDown="TabSearchBox_KeyDown" Margin="0,0,0,6" />
+                <ListBox x:Name="TabSearchList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                         FontSize="12" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         MouseDoubleClick="TabSearchList_DoubleClick" MaxHeight="220">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="4,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                           Foreground="{StaticResource BrushAccent}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{StaticResource BrushTextHi}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Sub}" FontSize="10.5"
+                                               Foreground="{StaticResource BrushTextLow}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
 
         <!-- ============ ПОШУК ПО СТОРІНЦІ (Ctrl+F) ============ -->
         <Border x:Name="FindBar" Style="{StaticResource GlassPanel}" Background="#F40B0F18"

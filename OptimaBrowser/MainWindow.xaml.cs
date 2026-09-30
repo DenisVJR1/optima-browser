@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -125,6 +126,8 @@ public partial class MainWindow : Window
     private readonly Stack<string> _closedTabs = new();
     private readonly HashSet<string> _siteAllow = new(StringComparer.OrdinalIgnoreCase); // per-site: не блокувати
     private TabVM? _dragTab; private bool _dragArmed, _dragMoved; private double _dragStartX;
+    private bool _verticalTabs = false;
+    private readonly List<(string Name, List<TabVM> Tabs)> _savedSessions = new();
     private int _findIdx;
     private bool _fullscreen;
     private static readonly (string P, string Url)[] Quick =
@@ -207,6 +210,12 @@ return JSON.stringify({n:all.length,i:idx2});
         "cpmstar.com", "adventive.com", "content.ad", "advertising.com", "unruly.co",
         "pixel.facebook.com", "connect.facebook.net", "ads-twitter.com", "static.criteo.net",
         "bidsxchange.com", "ad-maven.com", "skimresources.com", "aniview.com", "dsp.io",
+        // v2.2 extended
+        "adcolony.com", "inmobi.com", "unityads.unity3d.com", "applovin.com", "mopub.com",
+        "vungle.com", "chartboost.com", "fyber.com", "ironsrc.com", "startapp.com",
+        "yandexadexchange.net", "adriver.ru", "mail.ru/counter", "top-fwz1.mail.ru",
+        "gemius.pl", "hit.gemius.pl", "yadro.ru", "rambler.ru/cnt",
+        "betweendigital.com", "aax.amazon-adsystem.com", "pagead2.googlesyndication.com",
     };
 
     private string DataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OptimaBrowser");
@@ -257,22 +266,23 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.9 · рідке скло · один рушій · Optima Vault · досягнення · 6 тем · примусовий HTTPS</div>
+        <div class="s">версія 1.10 · liquid glass · один рушій · Optima Vault · 6 тем · авто-нічна тема · конвертер</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія + 🙈 виняток для окремого сайту</li>
         <li>Optima Vault — власне шифрування даних AES-256-GCM</li>
         <li>Примусовий HTTPS: http:// автоматично піднімається до https:// — реальний TLS</li>
-        <li>Вкладки можна **перетягувати** — свій порядок як у великих</li>
+        <li>Вкладки можна перетягувати — свій порядок як у великих</li>
+        <li>Пошук по вкладках (Ctrl+Shift+A), дублювання вкладки (Ctrl+Shift+K), контекстне меню вкладок</li>
         <li>Імпорт/експорт закладок (HTML) — кнопки у панелі закладок</li>
         <li>Завантаження з Ctrl+J, менеджер завантажень у папці Downloads, імена без перезапису</li>
         <li>Пошук на сторінці (Ctrl+F), повний екран (F11), мут звуку, калькулятор у адресному рядку</li>
-        <li>Backspace = назад, Ctrl+Enter = .com, Alt+Enter = нова вкладка, Ctrl+клік по підказці</li>
+        <li>Конвертер одиниць у адресному рядку: 100 usd в uah, 25c to f, 10 km mi, 5 kg lb</li>
         <li>Переклад — 12 мов (⋮ → Перекласти сторінку), обрана запам'ятовується</li>
-        <li>6 тем, авто-нічна тема 21:00–05:59, читач зі словами/часом, GC по RAM-пілу</li>
-        <li>33 досягнення, скріншот, PDF</li>
+        <li>6 тем (Glass, Океан, Полум'я, Ліс, Сакура, Північ), авто-нічна тема 21:00–05:59</li>
+        <li>34 досягнення, скріншот, PDF</li>
         </ul>
-        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок. Гарячі: Backspace назад · Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані.</div>
+        <div class="hint">Пасхалки: ↑↑↓↓←→←→BA, 42, «слава україні», «котик», optima:about, 13 вкладок. Гарячі: Backspace назад · Ctrl+F пошук · Ctrl+H історія · Ctrl+J завантаження · Ctrl+L адресний рядок · F11 повний екран · Ctrl+Shift+T закрита вкладка · Ctrl+Shift+Delete очистити дані · Ctrl+Shift+A пошук вкладок · Ctrl+Shift+K дублювати вкладку.</div>
         </div></body></html>
         """;
 
@@ -749,7 +759,6 @@ return JSON.stringify({n:all.length,i:idx2});
 
     // ---------- пошук по вкладках (Ctrl+Shift+A) ----------
     private readonly List<TabVM> _tabSearchResult = new();
-    /*
     private void OpenTabSearch() { TabSearchBox.Text = ""; FillTabSearch(""); TabSearch.Visibility = Visibility.Visible; TabSearchBox.Focus(); }
     private void FillTabSearch(string q)
     {
@@ -766,7 +775,42 @@ return JSON.stringify({n:all.length,i:idx2});
         int i = TabSearchList.SelectedIndex;
         if (i >= 0 && i < _tabSearchResult.Count) { TabSearch.Visibility = Visibility.Collapsed; ActivateTab(_tabSearchResult[i]); }
     }
-    */
+
+    private void ToggleVerticalTabs()
+    {
+        _verticalTabs = !_verticalTabs;
+        var factory = new FrameworkElementFactory(typeof(StackPanel));
+        factory.SetValue(StackPanel.OrientationProperty, _verticalTabs ? Orientation.Vertical : Orientation.Horizontal);
+        TabsHost.ItemsPanel = new ItemsPanelTemplate(factory);
+        TabsHost.Margin = _verticalTabs ? new Thickness(0, 40, 0, 0) : new Thickness(0);
+        StatusC(_verticalTabs ? "Вертикальні вкладки увімкнено" : "Горизонтальні вкладки увімкнено");
+    }
+
+    private void SaveSessionDialog()
+    {
+        var dlg = new InputDialog("Назва сесії", "Введіть назву для збереження поточної сесії:");
+        var res = dlg.ShowDialog();
+        if (res == true && !string.IsNullOrWhiteSpace(dlg.Result))
+        {
+            var tabs = _tabs.Select(t => new { t.Url, t.IsPrivate, t.Title }).ToList();
+            _savedSessions.Add((dlg.Result.Trim(), tabs.Select(x => new TabVM { Url = x.Url, IsPrivate = x.IsPrivate, Title = x.Title }).ToList()));
+            StatusC($"Сесію «{dlg.Result.Trim()}» збережено ({tabs.Count} вкладок)");
+        }
+    }
+
+    private void LoadSessionDialog()
+    {
+        if (_savedSessions.Count == 0) { StatusC("Збережених сесій немає"); return; }
+        var dlg = new SelectDialog("Оберіть сесію", _savedSessions.Select(s => s.Name).ToList());
+        var res = dlg.ShowDialog();
+        if (res == true && dlg.SelectedIndex >= 0)
+        {
+            var sess = _savedSessions[dlg.SelectedIndex];
+            foreach (var t in _tabs.ToList()) CloseTab(t);
+            foreach (var t in sess.Tabs) NewTab(t.Url, t.IsPrivate);
+            StatusC($"Сесію «{sess.Name}» відновлено ({sess.Tabs.Count} вкладок)");
+        }
+    }
 
     private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -1285,6 +1329,13 @@ return JSON.stringify({n:all.length,i:idx2});
         var fs = new MenuItem { Header = "Повний екран", InputGestureText = "F11", Icon = Png("fs") }; fs.Click += (_, _) => ToggleFullscreen();
         var mute = new MenuItem { Header = "Звук (mute)", Icon = Png("mute") }; mute.Click += (_, _) => ToggleMute();
         m.Items.Add(find); m.Items.Add(fs); m.Items.Add(mute);
+        var vtabs = new MenuItem { Header = "Вертикальні вкладки", InputGestureText = "Ctrl+Shift+V", Icon = Png("tab"), IsCheckable = true, IsChecked = _verticalTabs };
+        vtabs.Click += (_, _) => ToggleVerticalTabs();
+        m.Items.Add(vtabs);
+        m.Items.Add(new Separator());
+        var saveSess = new MenuItem { Header = "Зберегти сесію…", Icon = Png("tab") }; saveSess.Click += (_, _) => SaveSessionDialog();
+        var loadSess = new MenuItem { Header = "Відновити сесію…", Icon = Png("home") }; loadSess.Click += (_, _) => LoadSessionDialog();
+        m.Items.Add(saveSess); m.Items.Add(loadSess);
         m.Items.Add(new Separator());
         var bm = new MenuItem { Header = "Закладки", InputGestureText = "Ctrl+Shift+B", Icon = Png("bm") }; bm.Click += (_, _) => OpenDrawer("bookmarks");
         var hist = new MenuItem { Header = "Історія", InputGestureText = "Ctrl+H", Icon = Png("hist") }; hist.Click += (_, _) => OpenDrawer("history");
@@ -1599,6 +1650,7 @@ return JSON.stringify({n:all.length,i:idx2});
         var mods = Keyboard.Modifiers; bool ctrl = mods.HasFlag(ModifierKeys.Control); bool alt = mods.HasFlag(ModifierKeys.Alt); bool shift = mods.HasFlag(ModifierKeys.Shift);
         if (e.Key == Key.Escape)
         {
+            if (TabSearch.Visibility == Visibility.Visible) { TabSearch.Visibility = Visibility.Collapsed; e.Handled = true; return; }
             if (_fullscreen) { ToggleFullscreen(); e.Handled = true; return; }
             if (FindBar.Visibility == Visibility.Visible) { FindClose_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (Reader.Visibility == Visibility.Visible) { Reader.Visibility = Visibility.Collapsed; e.Handled = true; return; }
@@ -1625,9 +1677,13 @@ return JSON.stringify({n:all.length,i:idx2});
         else if (ctrl && e.Key == Key.D) { e.Handled = true; StarBtn_Click(this, new RoutedEventArgs()); }
         else if (ctrl && shift && e.Key == Key.C) { e.Handled = true; CopyAddress(); }
         else if (ctrl && shift && e.Key == Key.B) { e.Handled = true; OpenDrawer("bookmarks"); }
+        else if (ctrl && shift && e.Key == Key.A) { e.Handled = true; OpenTabSearch(); }
+        else if (ctrl && shift && e.Key == Key.K) { e.Handled = true; DuplicateTab(); }
+        else if (ctrl && shift && e.Key == Key.V) { e.Handled = true; ToggleVerticalTabs(); }
         else if (ctrl && e.Key == Key.H) { e.Handled = true; OpenDrawer("history"); }
         else if (ctrl && e.Key == Key.J) { e.Handled = true; OpenDownloads(); }
         else if (e.Key == Key.F11) { e.Handled = true; ToggleFullscreen(); }
+        else if (e.Key == Key.F12) { e.Handled = true; if (Core.CoreWebView2 != null) Core.CoreWebView2.OpenDevToolsWindow(); }
         else if (e.Key == Key.F3) { e.Handled = true; if (FindBar.Visibility == Visibility.Collapsed) OpenFind(); else _ = RunFindAsync(FindBox.Text, shift ? _findIdx - 1 : _findIdx + 1); }
         else if ((ctrl && e.Key == Key.R) || e.Key == Key.F5) { e.Handled = true; ReloadBtn_Click(this, new RoutedEventArgs()); }
         else if (alt && e.Key == Key.Left) { e.Handled = true; Core.CoreWebView2?.GoBack(); }
@@ -1657,4 +1713,59 @@ return JSON.stringify({n:all.length,i:idx2});
     private void Start_Requested(object? sender, RequestEventArgs e) { if (string.IsNullOrEmpty(e.Url)) return; if (e.NewTab) NewTab(e.Url); else NavigateActive(e.Url); }
     private void StatusC(string s) => StatusText.Text = s;
     private static string TryHost(string url) { try { return Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.Length > 0 ? u.Host : url; } catch { return url; } }
+}
+
+// Прості діалоги
+internal sealed class InputDialog : Window
+{
+    public string Result { get; private set; } = "";
+    public InputDialog(string title, string prompt)
+    {
+        Title = title; Width = 360; Height = 160; WindowStartupLocation = WindowStartupLocation.CenterOwner; ResizeMode = ResizeMode.NoResize; Background = System.Windows.Media.Brushes.Transparent; AllowsTransparency = true; WindowStyle = WindowStyle.None;
+        var border = new Border { Background = new SolidColorBrush(Color.FromArgb(240, 10, 13, 22)), CornerRadius = new CornerRadius(12), BorderBrush = new SolidColorBrush(Color.FromArgb(180, 53, 226, 208)), BorderThickness = new Thickness(1) };
+        var grid = new Grid { Margin = new Thickness(20) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var lbl = new TextBlock { Text = prompt, Foreground = System.Windows.Media.Brushes.White, FontSize = 13, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap };
+        var box = new TextBox { Name = "Box", FontSize = 14, Height = 30, Background = new SolidColorBrush(Color.FromArgb(180, 20, 24, 36)), Foreground = System.Windows.Media.Brushes.White, BorderBrush = new SolidColorBrush(Color.FromArgb(100, 53, 226, 208)), BorderThickness = new Thickness(1), CaretBrush = System.Windows.Media.Brushes.Cyan };
+        var btn = new Button { Content = "OK", Width = 80, Height = 32, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Background = new SolidColorBrush(Color.FromArgb(255, 53, 226, 208)), Foreground = System.Windows.Media.Brushes.Black, FontWeight = FontWeights.SemiBold, BorderThickness = new Thickness(0) };
+        btn.Click += (_, _) => { Result = box.Text; DialogResult = true; Close(); };
+        Grid.SetRow(lbl, 0); Grid.SetRow(box, 1); Grid.SetRow(btn, 2);
+        grid.Children.Add(lbl); grid.Children.Add(box); grid.Children.Add(btn);
+        border.Child = grid; Content = border;
+        Loaded += (_, _) => box.Focus();
+        KeyDown += (_, e) => { if (e.Key == Key.Enter) { Result = box.Text; DialogResult = true; Close(); } else if (e.Key == Key.Escape) { DialogResult = false; Close(); } };
+    }
+}
+
+internal sealed class SelectDialog : Window
+{
+    public int SelectedIndex { get; private set; } = -1;
+    public SelectDialog(string title, List<string> items)
+    {
+        Title = title; Width = 360; Height = Math.Min(400, 80 + items.Count * 32); WindowStartupLocation = WindowStartupLocation.CenterOwner; ResizeMode = ResizeMode.NoResize; Background = System.Windows.Media.Brushes.Transparent; AllowsTransparency = true; WindowStyle = WindowStyle.None;
+        var border = new Border { Background = new SolidColorBrush(Color.FromArgb(240, 10, 13, 22)), CornerRadius = new CornerRadius(12), BorderBrush = new SolidColorBrush(Color.FromArgb(180, 53, 226, 208)), BorderThickness = new Thickness(1) };
+        var grid = new Grid { Margin = new Thickness(12) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var lbl = new TextBlock { Text = title, Foreground = System.Windows.Media.Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        var list = new ListBox { Name = "Lst", Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0), FontSize = 13, Foreground = System.Windows.Media.Brushes.White };
+        list.ItemsSource = items;
+        list.ItemTemplate = new DataTemplate();
+        var factory = new FrameworkElementFactory(typeof(TextBlock));
+        factory.SetValue(TextBlock.TextProperty, new Binding("."));
+        factory.SetValue(TextBlock.MarginProperty, new Thickness(8, 6, 8, 6));
+        list.ItemTemplate.VisualTree = factory;
+        list.SelectionChanged += (_, _) => SelectedIndex = list.SelectedIndex;
+        list.MouseDoubleClick += (_, _) => { if (list.SelectedIndex >= 0) { DialogResult = true; Close(); } };
+        var btn = new Button { Content = "Вибрати", Width = 100, Height = 32, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0), Background = new SolidColorBrush(Color.FromArgb(255, 53, 226, 208)), Foreground = System.Windows.Media.Brushes.Black, FontWeight = FontWeights.SemiBold, BorderThickness = new Thickness(0) };
+        btn.Click += (_, _) => { if (list.SelectedIndex >= 0) { DialogResult = true; Close(); } };
+        Grid.SetRow(lbl, 0); Grid.SetRow(list, 1); Grid.SetRow(btn, 2);
+        grid.Children.Add(lbl); grid.Children.Add(list); grid.Children.Add(btn);
+        border.Child = grid; Content = border;
+        Loaded += (_, _) => { list.Focus(); if (items.Count > 0) list.SelectedIndex = 0; };
+        KeyDown += (_, e) => { if (e.Key == Key.Enter && list.SelectedIndex >= 0) { DialogResult = true; Close(); } else if (e.Key == Key.Escape) { DialogResult = false; Close(); } };
+    }
 }
