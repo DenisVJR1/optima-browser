@@ -508,7 +508,14 @@ return JSON.stringify({n:all.length,i:idx2});
 
     private void SaveSettings()
     {
-        try { Directory.CreateDirectory(DataDir); File.WriteAllText(SettingsFile, JsonSerializer.Serialize(_settings)); } catch { }
+        try { Directory.CreateDirectory(DataDir); AtomicWriteJson(SettingsFile, _settings); } catch { }
+    }
+
+    private static void AtomicWriteJson<T>(string path, T value)
+    {
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(value));
+        File.Move(temp, path, overwrite: true);
     }
 
     private void MarkDirty() { _dirty = true; _saveTimer.Stop(); _saveTimer.Start(); }
@@ -523,8 +530,8 @@ return JSON.stringify({n:all.length,i:idx2});
             if (_vaultActive) { if (_vaultPass == null) return; WriteVault(); }
             else
             {
-                File.WriteAllText(HistoryFile, JsonSerializer.Serialize(_history.Take(400).ToList()));
-                File.WriteAllText(BookmarkFile, JsonSerializer.Serialize(_bookmarks));
+                AtomicWriteJson(HistoryFile, _history.Take(400).ToList());
+                AtomicWriteJson(BookmarkFile, _bookmarks);
             }
         }
         catch { }
@@ -565,12 +572,12 @@ return JSON.stringify({n:all.length,i:idx2});
         try
         {
             Directory.CreateDirectory(DataDir);
-            File.WriteAllText(BoundsFile, JsonSerializer.Serialize(new Bounds(Left, Top, Width, Height, WindowState == WindowState.Maximized)));
+            AtomicWriteJson(BoundsFile, new Bounds(Left, Top, Width, Height, WindowState == WindowState.Maximized));
             if (_vaultActive) { if (_vaultPass != null) { CaptureSession(); WriteVault(); } return; }
             if (_settings.SaveSession)
             {
                 CaptureSession();
-                File.WriteAllText(SessionFile, JsonSerializer.Serialize(new SessionState(_sessUrls, _sessPriv)));
+                AtomicWriteJson(SessionFile, new SessionState(_sessUrls, _sessPriv));
             }
         }
         catch { }
@@ -806,8 +813,13 @@ return JSON.stringify({n:all.length,i:idx2});
         if (res == true && dlg.SelectedIndex >= 0)
         {
             var sess = _savedSessions[dlg.SelectedIndex];
-            foreach (var t in _tabs.ToList()) CloseTab(t);
+            // CloseTab() creates a replacement tab when the last tab closes.
+            // Clear directly so loading a saved session never leaves a blank tab.
+            _tabs.Clear();
+            _activeIdx = -1;
+            RefreshChrome();
             foreach (var t in sess.Tabs) NewTab(t.Url, t.IsPrivate);
+            if (_tabs.Count == 0) NewTab();
             StatusC($"Сесію «{sess.Name}» відновлено ({sess.Tabs.Count} вкладок)");
         }
     }
