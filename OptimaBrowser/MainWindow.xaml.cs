@@ -130,6 +130,7 @@ public partial class MainWindow : Window
     private readonly List<(string Name, List<TabVM> Tabs)> _savedSessions = new();
     private int _findIdx;
     private bool _fullscreen;
+    private readonly List<DrawerItem> _commandResults = new();
     private static readonly (string P, string Url)[] Quick =
     {
         ("g ",   "https://www.google.com/search?q="),
@@ -769,6 +770,87 @@ return JSON.stringify({n:all.length,i:idx2});
     // ---------- пошук по вкладках (Ctrl+Shift+A) ----------
     private readonly List<TabVM> _tabSearchResult = new();
     private void OpenTabSearch() { TabSearchBox.Text = ""; FillTabSearch(""); TabSearch.Visibility = Visibility.Visible; TabSearchBox.Focus(); }
+
+    private void OpenCommandPalette()
+    {
+        CommandBox.Text = "";
+        FillCommands("");
+        CommandPalette.Visibility = Visibility.Visible;
+        CommandBox.Focus();
+    }
+
+    private void FillCommands(string query)
+    {
+        var commands = new List<DrawerItem>
+        {
+            new("\uE710", "Нова вкладка", "Ctrl+T", "new-tab"),
+            new("\uE8A7", "Приватна вкладка", "Ctrl+Shift+N", "private-tab"),
+            new("\uE721", "Пошук по вкладках", "Ctrl+Shift+A", "tab-search"),
+            new("\uE774", "Privacy Dashboard", "захист поточного сайту", "privacy"),
+            new("\uE8A5", "Закладки", "Ctrl+Shift+B", "bookmarks"),
+            new("\uE81C", "Історія", "Ctrl+H", "history"),
+            new("\uE7C3", "Завантаження", "Ctrl+J", "downloads"),
+            new("\uE72C", "Оновити сторінку", "Ctrl+R", "reload"),
+            new("\uE74E", "Повний екран", "F11", "fullscreen"),
+        };
+        foreach (var tab in _tabs)
+            commands.Add(new DrawerItem("\uE7C3", tab.Title, tab.Url ?? "Нова вкладка", "tab:" + tab.Id));
+        _commandResults.Clear();
+        _commandResults.AddRange(commands.Where(x => query.Length == 0
+            || x.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || x.Sub.Contains(query, StringComparison.OrdinalIgnoreCase)));
+        CommandList.ItemsSource = _commandResults;
+        if (_commandResults.Count > 0) CommandList.SelectedIndex = 0;
+    }
+
+    private void CommandBox_TextChanged(object sender, TextChangedEventArgs e) => FillCommands(CommandBox.Text.Trim());
+    private void CommandBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { e.Handled = true; ExecuteCommand(); }
+        else if (e.Key == Key.Escape) { e.Handled = true; CommandPalette.Visibility = Visibility.Collapsed; Core.Focus(); }
+    }
+    private void CommandList_DoubleClick(object sender, MouseButtonEventArgs e) => ExecuteCommand();
+
+    private void ExecuteCommand()
+    {
+        if (CommandList.SelectedItem is not DrawerItem item) return;
+        CommandPalette.Visibility = Visibility.Collapsed;
+        switch (item.Url)
+        {
+            case "new-tab": NewTab(); break;
+            case "private-tab": NewTab(null, isPrivate: true); break;
+            case "tab-search": OpenTabSearch(); break;
+            case "privacy": OpenPrivacyDashboard(); break;
+            case "bookmarks": OpenDrawer("bookmarks"); break;
+            case "history": OpenDrawer("history"); break;
+            case "downloads": OpenDownloads(); break;
+            case "reload": ReloadBtn_Click(this, new RoutedEventArgs()); break;
+            case "fullscreen": ToggleFullscreen(); break;
+            default:
+                if (item.Url.StartsWith("tab:", StringComparison.Ordinal) && _tabs.FirstOrDefault(t => t.Id == item.Url[4..]) is TabVM tab)
+                    ActivateTab(tab);
+                break;
+        }
+    }
+
+    private void OpenPrivacyDashboard()
+    {
+        PrivacyHostText.Text = Active?.Url == null ? "Нова вкладка" : TryHost(Active.Url);
+        PrivacyBlockedText.Text = _blockedCount.ToString();
+        bool allowed = Active?.Url != null && _siteAllow.Contains(TryHost(Active.Url));
+        PrivacyStatusText.Text = allowed ? "Захист вимкнено для цього сайту" : (_settings.AdBlock ? "Захист увімкнено" : "Блокування вимкнено глобально");
+        PrivacyAllowBtn.Content = allowed ? "Увімкнути захист для цього сайту" : "Дозволити трекери для цього сайту";
+        PrivacyPanel.Visibility = Visibility.Visible;
+    }
+
+    private void PrivacyPanel_MouseDown(object sender, MouseButtonEventArgs e) { if (e.OriginalSource == PrivacyPanel) PrivacyPanel.Visibility = Visibility.Collapsed; }
+    private void PrivacyClose_Click(object sender, RoutedEventArgs e) => PrivacyPanel.Visibility = Visibility.Collapsed;
+    private void PrivacyAllow_Click(object sender, RoutedEventArgs e)
+    {
+        if (Active?.Url == null) return;
+        ToggleSiteAllow(TryHost(Active.Url));
+        OpenPrivacyDashboard();
+    }
     private void FillTabSearch(string q)
     {
         _tabSearchResult.Clear();
@@ -1699,6 +1781,8 @@ return JSON.stringify({n:all.length,i:idx2});
             if (VaultOverlay.Visibility == Visibility.Visible) { VaultCancel_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
             if (Drawer.Visibility == Visibility.Visible) { Drawer.Visibility = Visibility.Collapsed; e.Handled = true; return; }
             if (SuggPanel.Visibility == Visibility.Visible) { SuggPanel.Visibility = Visibility.Collapsed; e.Handled = true; return; }
+            if (CommandPalette.Visibility == Visibility.Visible) { CommandPalette.Visibility = Visibility.Collapsed; e.Handled = true; return; }
+            if (PrivacyPanel.Visibility == Visibility.Visible) { PrivacyPanel.Visibility = Visibility.Collapsed; e.Handled = true; return; }
         }
         if (!ctrl && !alt && !e.IsRepeat) { _konami.Enqueue(e.Key); while (_konami.Count > 10) _konami.Dequeue(); if (_konami.Count == 10 && _konami.SequenceEqual(KonamiSeq)) TriggerKonami(); }
 
@@ -1711,6 +1795,7 @@ return JSON.stringify({n:all.length,i:idx2});
         else if (ctrl && shift && (e.Key == Key.W || e.Key == Key.Q)) { e.Handled = true; Close(); }
         else if (ctrl && shift && e.Key == Key.Delete) { e.Handled = true; SettingsOverlay.Visibility = Visibility.Collapsed; _ = ClearDataCore(); }
         else if (ctrl && e.Key == Key.T) { e.Handled = true; NewTab(); }
+        else if (ctrl && e.Key == Key.K) { e.Handled = true; OpenCommandPalette(); }
         else if (ctrl && e.Key == Key.F) { e.Handled = true; OpenFind(); }
         else if (ctrl && e.Key == Key.W) { e.Handled = true; if (Active != null) CloseTab(Active); }
         else if (ctrl && e.Key == Key.L) { e.Handled = true; UrlBox.Focus(); UrlBox.SelectAll(); }
