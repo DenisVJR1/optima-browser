@@ -266,7 +266,7 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.10 · liquid glass · один рушій · Optima Vault · 6 тем · авто-нічна тема · конвертер</div>
+        <div class="s">версія 1.12 · liquid glass · один рушій · Optima Vault · 7 тем · авто-нічна тема · конвертер</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія + 🙈 виняток для окремого сайту</li>
