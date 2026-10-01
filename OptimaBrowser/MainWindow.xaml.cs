@@ -266,7 +266,7 @@ return JSON.stringify({n:all.length,i:idx2});
         </style></head><body><div class="card">
         <div class="logo">O</div>
         <h1>Optima Browser</h1>
-        <div class="s">версія 1.12 · liquid glass · один рушій · Optima Vault · 7 тем · авто-нічна тема · конвертер</div>
+        <div class="s">версія 1.13 · liquid glass · один рушій · Optima Vault · 7 тем · авто-нічна тема · конвертер</div>
         <ul>
         <li>Єдиний WebView2-рушій на всі вкладки, lazy-старт, suspend у фоновому режимі</li>
         <li>Блокування реклами й трекерів на рівні рушія + 🙈 виняток для окремого сайту</li>
@@ -312,6 +312,8 @@ return JSON.stringify({n:all.length,i:idx2});
         _metricsTimer.Tick += (_, _) => SampleMetrics();
         _fxTimer.Tick += FxTick;
         StateChanged += (_, _) => MaxGlyph.Text = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+        Activated += (_, _) => { if (_coreReady && !_metricsTimer.IsEnabled) _metricsTimer.Start(); };
+        Deactivated += (_, _) => _metricsTimer.Stop();
         SizeChanged += (_, _) => RefreshSuggPos();
         SearchCmb.ItemsSource = Engines;
         ThemeCmb.ItemsSource = Themes.Select(t => t.Label).ToList();
@@ -991,6 +993,7 @@ return JSON.stringify({n:all.length,i:idx2});
             c.Settings.IsGeneralAutofillEnabled = _settings.Autofill; c.Settings.IsPasswordAutosaveEnabled = _settings.Autofill;
             c.Settings.IsPinchZoomEnabled = true; c.Settings.IsZoomControlEnabled = true;
             c.NewWindowRequested += Core_NewWindowRequested; c.ProcessFailed += Core_ProcessFailed;
+            c.PermissionRequested += Core_PermissionRequested;
             c.DownloadStarting += Core_DownloadStarting;
             c.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             c.WebResourceRequested += Core_WebResourceRequested;
@@ -1009,7 +1012,7 @@ return JSON.stringify({n:all.length,i:idx2});
             var host = new Uri(e.Request.Uri).Host;
             if (_siteAllow.Contains(host)) return; // per-site дозвіл: реклама не блокується
             foreach (var b in BlockedHosts)
-                if (host.EndsWith(b, StringComparison.OrdinalIgnoreCase))
+                if (IsBlockedHost(host, b))
                 {
                     _blockedCount++; e.Response = Core.CoreWebView2!.Environment.CreateWebResourceResponse(null, 403, "Blocked by Optima", null);
                     BlockedPill.Text = $"Заблоковано: {_blockedCount}";
@@ -1021,6 +1024,31 @@ return JSON.stringify({n:all.length,i:idx2});
         }
         catch { }
     }
+
+    private static bool IsBlockedHost(string host, string blocked)
+    {
+        host = host.TrimEnd('.');
+        blocked = blocked.TrimEnd('.');
+        return host.Equals(blocked, StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith("." + blocked, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void Core_PermissionRequested(object? sender, CoreWebView2PermissionRequestedEventArgs e)
+    {
+        // Permissions are denied by default. This keeps camera, microphone,
+        // location and notifications opt-in instead of silently trusting sites.
+        e.State = CoreWebView2PermissionState.Deny;
+        Dispatcher.BeginInvoke(() => StatusC($"Доступ {PermissionLabel(e.PermissionKind)} заблоковано для {TryHost(e.Uri)}"));
+    }
+
+    private static string PermissionLabel(CoreWebView2PermissionKind kind) => kind switch
+    {
+        CoreWebView2PermissionKind.Geolocation => "геолокації",
+        CoreWebView2PermissionKind.Camera => "камери",
+        CoreWebView2PermissionKind.Microphone => "мікрофона",
+        CoreWebView2PermissionKind.Notifications => "сповіщень",
+        _ => "дозвіл"
+    };
 
     private void Core_ProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e) { if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited) { StatusC("Рушій завершився — відновлюю…"); Dispatcher.BeginInvoke(() => { try { Core.CoreWebView2?.Reload(); } catch { } }); } }
 
